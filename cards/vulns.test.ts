@@ -37,27 +37,104 @@ describe('map', () => {
 });
 
 describe('derive', () => {
-  it('sorts by severity and caps at five per repo', () => {
-    const alerts = [
-      { severity: 'LOW', pkg: 'p1' }, { severity: 'CRITICAL', pkg: 'p2' },
-      { severity: 'MODERATE', pkg: 'p3' }, { severity: 'HIGH', pkg: 'p4' },
-      { severity: 'LOW', pkg: 'p5' }, { severity: 'LOW', pkg: 'p6' },
-    ];
-    const data = vulnsModule.graphql!.map(resp([repo('widgetlib', alerts)]), undefined);
-    const { slice } = vulnsModule.derive(data, undefined, NOW);
-    expect(slice.items).toHaveLength(5);
-    expect(slice.items[0].badge?.text).toBe('critical');
-    expect(slice.items[0].badge?.tone).toBe('crit');
-    expect(slice.items[1].badge?.text).toBe('high');
-  });
-
-  it('tile totals all alerts and notes criticals', () => {
+  it('emits one row per repo with counts [C, H, M, L] and tones [crit, warn, mid, dim]', () => {
     const data = vulnsModule.graphql!.map(resp([
-      repo('widgetlib', [{ severity: 'CRITICAL', pkg: 'lodash' }]),
-      repo('parsekit', [{ severity: 'HIGH', pkg: 'undici' }, { severity: 'MODERATE', pkg: 'semver' }]),
+      repo('widgetlib', [
+        { severity: 'CRITICAL', pkg: 'lodash' },
+        { severity: 'HIGH', pkg: 'undici' },
+        { severity: 'MODERATE', pkg: 'semver' },
+        { severity: 'LOW', pkg: 'debug' },
+      ]),
     ]), undefined);
     const { slice } = vulnsModule.derive(data, undefined, NOW);
-    expect(slice.tile).toMatchObject({ n: 3, note: '1 critical', noteTone: 'crit' });
+    expect(slice.items).toHaveLength(1);
+    expect(slice.items[0].id).toBe('cgallopo/widgetlib');
+    expect(slice.items[0].counts).toEqual([
+      { value: 1, tone: 'crit' },
+      { value: 1, tone: 'warn' },
+      { value: 1, tone: 'mid' },
+      { value: 1, tone: 'dim' },
+    ]);
+  });
+
+  it('zero counts always take tone dim', () => {
+    const data = vulnsModule.graphql!.map(resp([
+      repo('clean-repo', [{ severity: 'CRITICAL', pkg: 'lodash' }]),
+      repo('only-high', [{ severity: 'HIGH', pkg: 'undici' }, { severity: 'HIGH', pkg: 'other' }]),
+    ]), undefined);
+    const { slice } = vulnsModule.derive(data, undefined, NOW);
+    const cleanRow = slice.items.find((i) => i.repo === 'clean-repo');
+    const highRow = slice.items.find((i) => i.repo === 'only-high');
+    expect(cleanRow?.counts).toEqual([
+      { value: 1, tone: 'crit' },
+      { value: 0, tone: 'dim' },
+      { value: 0, tone: 'dim' },
+      { value: 0, tone: 'dim' },
+    ]);
+    expect(highRow?.counts).toEqual([
+      { value: 0, tone: 'dim' },
+      { value: 2, tone: 'warn' },
+      { value: 0, tone: 'dim' },
+      { value: 0, tone: 'dim' },
+    ]);
+  });
+
+  it('rows sort most-severe-first: descending by [C, H, M, L]', () => {
+    const data = vulnsModule.graphql!.map(resp([
+      repo('low-only', [{ severity: 'LOW', pkg: 'p1' }]),
+      repo('critical-and-high', [{ severity: 'CRITICAL', pkg: 'p2' }, { severity: 'HIGH', pkg: 'p3' }]),
+      repo('moderate-only', [{ severity: 'MODERATE', pkg: 'p4' }]),
+      repo('high-only', [{ severity: 'HIGH', pkg: 'p5' }]),
+    ]), undefined);
+    const { slice } = vulnsModule.derive(data, undefined, NOW);
+    expect(slice.items.map((i) => i.repo)).toEqual([
+      'critical-and-high',
+      'high-only',
+      'moderate-only',
+      'low-only',
+    ]);
+  });
+
+  it('excludes ignored repos from rows and tile totals', () => {
+    const data = vulnsModule.graphql!.map(resp([
+      repo('widgetlib', [{ severity: 'CRITICAL', pkg: 'lodash' }]),
+      repo('ignored-repo', [{ severity: 'CRITICAL', pkg: 'other' }]),
+      repo('parsekit', [{ severity: 'HIGH', pkg: 'undici' }]),
+    ]), undefined);
+    const config = {
+      pat: 'test',
+      pollMinutes: 30,
+      themePin: 'system' as const,
+      modules: {
+        prs: { ignoredRepos: [], includeReviewRequests: true, rowCap: 8, staleDays: 0 },
+        vulns: { ignoredRepos: ['cgallopo/ignored-repo'] },
+        stars: { trackedRepos: [] },
+      },
+    };
+    const { slice } = vulnsModule.derive(data, undefined, NOW, config);
+    expect(slice.items).toHaveLength(2);
+    expect(slice.items.map((i) => i.repo)).toEqual(['widgetlib', 'parsekit']);
+    expect(slice.tile?.n).toBe(2);
+    expect(slice.tile?.note).toBe('1 critical');
+  });
+
+  it('headerLabel shows total after ignore', () => {
+    const data = vulnsModule.graphql!.map(resp([
+      repo('widgetlib', [{ severity: 'CRITICAL', pkg: 'lodash' }, { severity: 'HIGH', pkg: 'undici' }]),
+      repo('ignored-repo', [{ severity: 'CRITICAL', pkg: 'other' }]),
+    ]), undefined);
+    const config = {
+      pat: 'test',
+      pollMinutes: 30,
+      themePin: 'system' as const,
+      modules: {
+        prs: { ignoredRepos: [], includeReviewRequests: true, rowCap: 8, staleDays: 0 },
+        vulns: { ignoredRepos: ['cgallopo/ignored-repo'] },
+        stars: { trackedRepos: [] },
+      },
+    };
+    const { slice } = vulnsModule.derive(data, undefined, NOW, config);
+    expect(slice.headerLabel).toBe('Vulnerabilities (2) · 1/1/0/0');
   });
 
   it('links rows to the repo dependabot page', () => {

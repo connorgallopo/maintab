@@ -64,31 +64,49 @@ function map(resp: unknown, prev: VulnsData | undefined, _config?: Config): Vuln
   };
 }
 
-function derive(data: VulnsData, _stored: undefined, _now: number, _config?: Config): { slice: Slice; stored: undefined } {
-  const rows = data.repos.flatMap((r) =>
-    [...r.alerts]
-      .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity))
-      .slice(0, 5)
-      .map((a, i) => ({
-        id: `${r.repo}:${a.pkg}:${i}`,
+function derive(data: VulnsData, _stored: undefined, _now: number, config?: Config): { slice: Slice; stored: undefined } {
+  const ignoredRepos = config?.modules.vulns.ignoredRepos ?? [];
+  const filtered = data.repos.filter((r) => !ignoredRepos.includes(r.repo));
+
+  const rows = filtered
+    .map((r) => {
+      const counts = [0, 0, 0, 0];
+      for (const alert of r.alerts) {
+        const idx = SEVERITY_ORDER.indexOf(alert.severity);
+        if (idx >= 0) counts[idx]++;
+      }
+      const tonemap = ['crit', 'warn', 'mid', 'dim'] as const;
+      return {
+        id: r.repo,
         href: `${r.url}/security/dependabot`,
         repo: r.repo.split('/')[1],
-        primary: a.pkg,
-        badge: {
-          kind: 'tag' as const,
-          text: a.severity.toLowerCase(),
-          tone: a.severity === 'CRITICAL' ? ('crit' as const) : a.severity === 'HIGH' ? ('warn' as const) : ('dim' as const),
-        },
-      })),
-  );
-  const total = data.repos.reduce((n, r) => n + r.alerts.length, 0);
-  const criticals = data.repos.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'CRITICAL').length, 0);
+        primary: '',
+        counts: counts.map((value, i) => ({
+          value,
+          tone: (value === 0 ? 'dim' : tonemap[i]) as const,
+        })),
+      };
+    })
+    .sort((a, b) => {
+      for (let i = 0; i < 4; i++) {
+        const diff = (b.counts[i]?.value ?? 0) - (a.counts[i]?.value ?? 0);
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
+
+  const total = filtered.reduce((n, r) => n + r.alerts.length, 0);
+  const criticals = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'CRITICAL').length, 0);
+  const highs = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'HIGH').length, 0);
+  const moderates = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'MODERATE').length, 0);
+  const lows = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'LOW').length, 0);
+
   return {
     slice: {
       status: rows.length ? 'ok' : 'empty',
       emptyText: 'No open alerts',
       headerHref: 'https://github.com/notifications?query=is%3Arepository-vulnerability-alert',
-      headerLabel: `Vulnerabilities (${total})`,
+      headerLabel: `Vulnerabilities (${total}) · ${criticals}/${highs}/${moderates}/${lows}`,
       items: rows,
       tile: {
         n: total,

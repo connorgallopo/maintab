@@ -14,6 +14,11 @@
   {#if item.badge}
     <span class="badge {item.badge.kind} tone-{item.badge.tone}">{item.badge.text}</span>
   {/if}
+  {#if item.counts}
+    <span class="counts">
+      {#each item.counts as c, i}{#if i}<span class="sep">/</span>{/if}<span class="cnt tone-{c.tone}">{c.value}</span>{/each}
+    </span>
+  {/if}
   {#if onact}
     <button class="act" aria-label="Mark as read" onclick={(e) => { e.preventDefault(); e.stopPropagation(); onact(); }}>&#10003;</button>
   {/if}
@@ -36,6 +41,14 @@
   .tag.tone-warn { color: var(--warn); }
   .tag.tone-good { color: var(--good); }
   .tag.tone-dim, .tag.tone-accent { color: var(--sub); }
+  .counts { display: flex; gap: 2px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .sep { color: var(--dim); }
+  .cnt.tone-crit { color: var(--crit); }
+  .cnt.tone-warn { color: var(--warn); }
+  .cnt.tone-mid { color: var(--sub); }
+  .cnt.tone-good { color: var(--good); }
+  .cnt.tone-accent { color: var(--accent); }
+  .cnt.tone-dim { color: var(--dim); }
   .act { opacity: 0; border: none; background: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 2px 4px; }
   .row:hover .act, .act:focus-visible { opacity: 1; }
 </style>
