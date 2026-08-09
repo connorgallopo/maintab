@@ -24,7 +24,6 @@
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
     padding: 12px 20px; color: var(--ink); text-decoration: none; cursor: pointer;
   }
-  .row + .row { border-top: 1px solid var(--hair); }
   .row:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
   .main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .repo { font-family: var(--font-mono); font-size: 11px; color: var(--sub); white-space: nowrap; }

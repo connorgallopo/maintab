@@ -37,3 +37,7 @@ body {
   font-size: 14px;
   min-height: 100vh;
 }
+
+/* cross-instance sibling separators; svelte prunes these from component styles as unused */
+.row + .row { border-top: 1px solid var(--hair); }
+.stat + .stat { border-left: 1px solid var(--border); }

@@ -11,7 +11,6 @@
 
 <style>
   .stat { flex: 1; padding: 18px 22px 15px; }
-  .stat + .stat { border-left: 1px solid var(--border); }
   .n {
     font-size: 44px; font-weight: 700; line-height: 1;
     font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
