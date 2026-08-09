@@ -47,7 +47,7 @@
   }
 
   async function savePat(pat: string) {
-    await configItem.setValue({ ...config, pat });
+    await configItem.setValue({ ...$state.snapshot(config), pat });
     refresh();
   }
 

@@ -29,7 +29,7 @@
       pat: pat.trim(),
       pollMinutes: Math.min(60, Math.max(1, Number(pollMinutes) || 5)),
       themePin,
-      modules: { stars: { trackedRepos: repos } },
+      modules: { stars: { trackedRepos: $state.snapshot(repos) } },
     });
     onclose();
   }
