@@ -2,7 +2,8 @@
   "name": "maintab",
   "version": "1.0.0",
   "description": "A new tab page for GitHub maintainers.",
-  "main": "index.js",
+  "license": "MIT",
+  "repository": "github:connorgallopo/maintab",
   "scripts": {
     "dev": "wxt",
     "build": "wxt build -b firefox",
@@ -10,9 +11,6 @@
     "test": "vitest run --passWithNoTests",
     "check": "bash scripts/check-modules.sh && vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
