@@ -1,0 +1,6 @@
+.superpowers/
+node_modules/
+.wxt/
+dist/
+.output/
+.env
