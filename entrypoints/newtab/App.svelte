@@ -1,5 +1,6 @@
 <!-- entrypoints/newtab/App.svelte -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { browser } from '#imports';
   import type { Config, ModulesState, SyncState, Tile } from '../../lib/types';
   import { configItem, syncItem, modulesItem } from '../../lib/storage';
@@ -13,9 +14,9 @@
 
   let { config: c0, sync: s0, modules: m0 }: { config: Config; sync: SyncState; modules: ModulesState } = $props();
 
-  let config = $state(c0);
-  let sync = $state(s0);
-  let modules = $state(m0);
+  let config = $state(untrack(() => c0));
+  let sync = $state(untrack(() => s0));
+  let modules = $state(untrack(() => m0));
   let settingsOpen = $state(false);
   let Settings: typeof import('./Settings.svelte').default | null = $state(null);
 
