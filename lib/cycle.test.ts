@@ -82,6 +82,13 @@ describe('runCycle', () => {
     expect(Object.keys(await modulesItem.getValue())).toHaveLength(4);
   });
 
+  it('dedupes overlapping invocations in memory', async () => {
+    stubGithub();
+    const [a, b] = await Promise.all([runCycle(NOW), runCycle(NOW)]);
+    expect([a, b].sort()).toEqual(['in-flight', 'ok']);
+    expect(github.graphql).toHaveBeenCalledTimes(1);
+  });
+
   it('follows pagination cursors', async () => {
     const page2 = { viewer: { ...GQL_RESP.viewer, repositories: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } };
     const page1 = { viewer: { ...GQL_RESP.viewer, repositories: { pageInfo: { hasNextPage: true, endCursor: 'c1' }, nodes: [] } } };

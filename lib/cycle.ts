@@ -16,7 +16,9 @@ function buildQuery(config: Config, only?: { fragment: (c: Config, cur: string |
   return `query { ${body} }`;
 }
 
-export async function runCycle(now: number = Date.now()): Promise<'ok' | 'no-token' | 'backoff' | 'in-flight' | 'auth-error' | 'error'> {
+export type CycleStatus = 'ok' | 'no-token' | 'backoff' | 'in-flight' | 'auth-error' | 'error';
+
+async function cycle(now: number): Promise<CycleStatus> {
   const config = await configItem.getValue();
   if (!config.pat) return 'no-token';
   const sync = await syncItem.getValue();
@@ -74,5 +76,17 @@ export async function runCycle(now: number = Date.now()): Promise<'ok' | 'no-tok
     }
     await syncItem.setValue(patch);
     return 'error';
+  }
+}
+
+let inFlight: Promise<CycleStatus> | null = null;
+
+export async function runCycle(now: number = Date.now()): Promise<CycleStatus> {
+  if (inFlight) return 'in-flight';
+  inFlight = cycle(now);
+  try {
+    return await inFlight;
+  } finally {
+    inFlight = null;
   }
 }
