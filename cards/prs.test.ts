@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { prsModule, markSeen } from './prs';
-import type { PrView, RevView, PrsData } from './prs';
+import type { PrView, RevView, PrsData, PrsStored } from './prs';
 import { modulesItem, CONFIG_DEFAULTS } from '../lib/storage';
 import type { Config } from '../lib/types';
 
@@ -292,5 +292,17 @@ describe('markSeen', () => {
     const d = state.prs.data as { seen: Record<string, { commentTotal: number }> };
     expect(d.seen.a.commentTotal).toBe(6);
     expect(state.prs.slice.items[0].badge).toBeUndefined();
+  });
+
+  it('leaves a review-tagged row untouched, without writing a marker', async () => {
+    const { slice } = prsModule.derive(data([], [rev('r')]), undefined, NOW);
+    const stored: PrsStored = { seen: { a: { commentTotal: 1, seenAt: NOW } } };
+    await modulesItem.setValue({ prs: { v: 1, slice, data: stored } });
+    await markSeen('r');
+    const state = await modulesItem.getValue();
+    const d = state.prs.data as PrsStored;
+    expect(d.seen.r).toBeUndefined();
+    expect(d.seen.a).toEqual({ commentTotal: 1, seenAt: NOW });
+    expect(state.prs.slice.items[0].badge).toEqual({ kind: 'tag', text: 'review', tone: 'accent' });
   });
 });

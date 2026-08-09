@@ -177,6 +177,7 @@ export async function markSeen(prId: string): Promise<void> {
   const data = entry.data as PrsStored;
   const item = entry.slice.items.find((i) => i.id === prId);
   if (!item) return;
+  if (item.badge && item.badge.kind !== 'pill') return;
   const current = data.seen[prId];
   const unread = item.badge ? Number.parseInt(item.badge.text, 10) : 0;
   data.seen[prId] = { commentTotal: (current?.commentTotal ?? 0) + unread, seenAt: Date.now() };
