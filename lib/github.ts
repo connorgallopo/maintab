@@ -31,9 +31,8 @@ export async function graphql<T>(pat: string, query: string): Promise<T> {
   });
   throwForStatus(res);
   const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
-  if (body.errors?.length) throw new Error(body.errors[0].message);
-  if (!body.data) throw new Error('empty graphql response');
-  return body.data;
+  if (body.data) return body.data;
+  throw new Error(body.errors?.[0]?.message ?? 'empty graphql response');
 }
 
 export async function restGet(

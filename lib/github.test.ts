@@ -31,9 +31,15 @@ describe('graphql', () => {
     expect(err.resetAt).toBe(1800000000_000);
   });
 
-  it('throws on graphql-level errors', async () => {
+  it('throws on graphql-level errors with no data', async () => {
     mockFetch(200, { errors: [{ message: 'boom' }] });
     await expect(graphql('tok', '{}')).rejects.toThrow('boom');
+  });
+
+  it('returns partial data alongside errors', async () => {
+    mockFetch(200, { data: { s0: null }, errors: [{ message: 'NOT_FOUND' }] });
+    const data = await graphql('tok', '{}');
+    expect(data).toEqual({ s0: null });
   });
 });
 
