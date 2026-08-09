@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Config } from '../../lib/types';
   import { configItem } from '../../lib/storage';
-  import { parseRepo } from '../../lib/repos';
+  import RepoListEditor from '../../components/kit/RepoListEditor.svelte';
   import { untrack } from 'svelte';
 
   let { config, onclose }: { config: Config; onclose: () => void } = $props();
@@ -9,27 +9,32 @@
   let pat = $state(untrack(() => config.pat));
   let pollMinutes = $state(untrack(() => config.pollMinutes));
   let themePin = $state(untrack(() => config.themePin));
-  let repos = $state(untrack(() => [...config.modules.stars.trackedRepos]));
-  let newRepo = $state('');
-  let repoError = $state('');
+  let prsIgnoredRepos = $state(untrack(() => [...config.modules.prs.ignoredRepos]));
+  let includeReviewRequests = $state(untrack(() => config.modules.prs.includeReviewRequests));
+  let rowCap = $state(untrack(() => config.modules.prs.rowCap));
+  let staleDays = $state(untrack(() => config.modules.prs.staleDays));
+  let vulnsIgnoredRepos = $state(untrack(() => [...config.modules.vulns.ignoredRepos]));
+  let trackedRepos = $state(untrack(() => [...config.modules.stars.trackedRepos]));
 
-  function addRepo() {
-    const parsed = parseRepo(newRepo);
-    if (!parsed) {
-      repoError = 'Use owner/name or a github.com URL';
-      return;
-    }
-    if (!repos.includes(parsed)) repos.push(parsed);
-    newRepo = '';
-    repoError = '';
+  function clamp(value: number, min: number, max: number, fallback: number): number {
+    return Math.min(max, Math.max(min, Number(value) || fallback));
   }
 
   async function save() {
     await configItem.setValue({
       pat: pat.trim(),
-      pollMinutes: Math.min(60, Math.max(1, Number(pollMinutes) || 5)),
+      pollMinutes: clamp(pollMinutes, 1, 60, 5),
       themePin,
-      modules: { stars: { trackedRepos: $state.snapshot(repos) } },
+      modules: {
+        prs: {
+          ignoredRepos: $state.snapshot(prsIgnoredRepos),
+          includeReviewRequests,
+          rowCap: clamp(rowCap, 3, 20, 8),
+          staleDays: clamp(staleDays, 0, 365, 0),
+        },
+        vulns: { ignoredRepos: $state.snapshot(vulnsIgnoredRepos) },
+        stars: { trackedRepos: $state.snapshot(trackedRepos) },
+      },
     });
     onclose();
   }
@@ -60,20 +65,30 @@
   </label>
 
   <fieldset>
+    <legend>Pull requests</legend>
+    <RepoListEditor repos={prsIgnoredRepos} onchange={(r) => (prsIgnoredRepos = r)} />
+    <label class="checkbox">
+      <input type="checkbox" bind:checked={includeReviewRequests} />
+      Show PRs waiting on my review
+    </label>
+    <label>
+      Rows
+      <input type="number" min="3" max="20" bind:value={rowCap} />
+    </label>
+    <label>
+      Hide after days without activity (0 keeps everything)
+      <input type="number" min="0" max="365" bind:value={staleDays} />
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Vulnerabilities</legend>
+    <RepoListEditor repos={vulnsIgnoredRepos} onchange={(r) => (vulnsIgnoredRepos = r)} />
+  </fieldset>
+
+  <fieldset>
     <legend>Star tracking</legend>
-    <ul>
-      {#each repos as repo, i}
-        <li>
-          <span>{repo}</span>
-          <button onclick={() => repos.splice(i, 1)} aria-label="Remove {repo}">remove</button>
-        </li>
-      {/each}
-    </ul>
-    <form onsubmit={(e) => { e.preventDefault(); addRepo(); }}>
-      <input bind:value={newRepo} placeholder="owner/name" />
-      <button type="submit">Add</button>
-    </form>
-    {#if repoError}<p class="err">{repoError}</p>{/if}
+    <RepoListEditor repos={trackedRepos} onchange={(r) => (trackedRepos = r)} />
   </fieldset>
 
   <div class="actions">
@@ -92,22 +107,15 @@
   }
   h2 { font-size: 18px; }
   label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--sub); }
+  label.checkbox { flex-direction: row; align-items: center; gap: 8px; }
   input, select {
     background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
     padding: 8px 10px; color: var(--ink); font-family: var(--font-mono); font-size: 12px;
   }
-  .hint, .err { font-size: 11px; color: var(--dim); }
-  .err { color: var(--crit); }
-  fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  input[type="checkbox"] { width: 16px; height: 16px; padding: 0; background: none; border: none; }
+  .hint { font-size: 11px; color: var(--dim); }
+  fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
   legend { font-size: 12px; color: var(--sub); padding: 0 6px; }
-  ul { list-style: none; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-  li { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; }
-  li button, form button {
-    background: none; border: none; color: var(--accent); cursor: pointer;
-    font-family: var(--font-mono); font-size: 11px;
-  }
-  form { display: flex; gap: 8px; }
-  form input { flex: 1; }
   .actions { display: flex; gap: 10px; margin-top: auto; }
   .save {
     background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px;
