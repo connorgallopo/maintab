@@ -7,8 +7,8 @@ import * as github from './github';
 const NOW = 1_800_000_000_000;
 
 const GQL_RESP = {
+  prsAuth: { issueCount: 0, nodes: [] },
   viewer: {
-    pullRequests: { totalCount: 0, nodes: [] },
     repositories: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
   },
 };
@@ -99,8 +99,8 @@ describe('runCycle', () => {
   });
 
   it('follows pagination cursors', async () => {
-    const page2 = { viewer: { ...GQL_RESP.viewer, repositories: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } };
-    const page1 = { viewer: { ...GQL_RESP.viewer, repositories: { pageInfo: { hasNextPage: true, endCursor: 'c1' }, nodes: [] } } };
+    const page2 = { ...GQL_RESP, viewer: { repositories: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } };
+    const page1 = { ...GQL_RESP, viewer: { repositories: { pageInfo: { hasNextPage: true, endCursor: 'c1' }, nodes: [] } } };
     const spy = vi.spyOn(github, 'graphql')
       .mockResolvedValueOnce(page1)
       .mockResolvedValueOnce(page2);
