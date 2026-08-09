@@ -2,7 +2,7 @@
 
 A new tab page for GitHub maintainers.
 
-Screenshot: `docs/screenshot.png` (added after the first build worth showing).
+![The maintab dashboard: clock, stat row, open pull requests, notifications, vulnerabilities, and star trends on a dark surface](docs/readme-hero.svg)
 
 ## What it shows
 
