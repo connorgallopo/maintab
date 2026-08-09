@@ -20,7 +20,8 @@ function fragment(config: Config, _cursor: string | null): string {
     .join('\n');
 }
 
-function map(resp: unknown, _prev: StarsData | undefined, config: Config): StarsData {
+function map(resp: unknown, _prev: StarsData | undefined, config?: Config): StarsData {
+  if (!config) return {};
   const out: StarsData = {};
   config.modules.stars.trackedRepos.forEach((full, i) => {
     const node = (resp as Record<string, { stargazerCount: number } | null>)[`s${i}`];
