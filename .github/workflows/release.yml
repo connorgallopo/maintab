@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: pnpm check
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [check]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set version from tag
+        run: npm pkg set version="${GITHUB_REF_NAME#v}"
+
+      - name: Build and zip
+        run: pnpm zip
+
+      - name: Get tag annotation
+        run: |
+          # Use subject+body to exclude GPG/SSH signatures from signed tags
+          SUBJECT=$(git tag -l --format='%(contents:subject)' ${{ github.ref_name }})
+          BODY=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
+          if [ -n "$BODY" ]; then
+            printf '%s\n\n%s\n' "$SUBJECT" "$BODY" > tag_message.txt
+          else
+            echo "$SUBJECT" > tag_message.txt
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        with:
+          name: ${{ github.ref_name }}
+          body_path: tag_message.txt
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |
+            .output/*-firefox.zip
+            .output/*-sources.zip
