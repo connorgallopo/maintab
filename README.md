@@ -40,7 +40,7 @@ Star history accumulates from the moment you install the extension. GitHub only 
 
 ## Contributing
 
-Each card under `cards/` is a module: one file that fetches its data, derives a display slice, and composes the shared kit components for layout. Modules don't carry their own styling. All design tokens, typography, spacing, and card chrome belong to the host kit, and the build fails a module that imports a stylesheet, sets a `style` attribute, or defines a `<style>` block:
+Each card under `cards/` is a module: one file that fetches its data, derives a display slice, and composes the shared kit components for layout. Modules don't carry their own styling. All design tokens, typography, spacing, and card chrome belong to the host kit, and the check step fails a module that imports a stylesheet, sets a `style` attribute, or defines a `<style>` block:
 
 ```
 pnpm check
