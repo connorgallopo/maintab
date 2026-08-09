@@ -1,7 +1,9 @@
-import type { Config, ModuleDef, Slice } from '../lib/types';
+import type { Config, ModuleDef, Slice, Tone } from '../lib/types';
 
 const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MODERATE', 'LOW'] as const;
 type Severity = (typeof SEVERITY_ORDER)[number];
+
+const TONE_ORDER: readonly Tone[] = ['crit', 'warn', 'mid', 'dim'];
 
 export interface RepoAlerts {
   repo: string;
@@ -73,9 +75,8 @@ function derive(data: VulnsData, _stored: undefined, _now: number, config?: Conf
       const counts = [0, 0, 0, 0];
       for (const alert of r.alerts) {
         const idx = SEVERITY_ORDER.indexOf(alert.severity);
-        if (idx >= 0) counts[idx]++;
+        if (idx >= 0) counts[idx] = (counts[idx] ?? 0) + 1;
       }
-      const tonemap = ['crit', 'warn', 'mid', 'dim'] as const;
       return {
         id: r.repo,
         href: `${r.url}/security/dependabot`,
@@ -83,7 +84,7 @@ function derive(data: VulnsData, _stored: undefined, _now: number, config?: Conf
         primary: '',
         counts: counts.map((value, i) => ({
           value,
-          tone: (value === 0 ? 'dim' : tonemap[i]) as const,
+          tone: value === 0 ? 'dim' : (TONE_ORDER[i] ?? 'dim'),
         })),
       };
     })
