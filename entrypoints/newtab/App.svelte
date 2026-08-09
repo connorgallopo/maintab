@@ -61,8 +61,10 @@
 
   const commentsTile = $derived.by((): Tile => {
     const items = modules.prs?.slice.items ?? [];
-    const unread = items.reduce((n, i) => n + (i.badge ? Number.parseInt(i.badge.text, 10) || 0 : 0), 0);
-    const touched = items.filter((i) => i.badge).length;
+    const unread = items
+      .filter((i) => i.badge?.kind === 'pill')
+      .reduce((n, i) => n + (Number.parseInt(i.badge!.text, 10) || 0), 0);
+    const touched = items.filter((i) => i.badge?.kind === 'pill').length;
     return {
       n: unread, label: 'New comments', accent: unread > 0,
       note: touched ? `${touched} PR${touched === 1 ? '' : 's'} touched` : undefined,

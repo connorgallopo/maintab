@@ -134,7 +134,7 @@ describe('derive', () => {
       },
     };
     const { slice } = vulnsModule.derive(data, undefined, NOW, config);
-    expect(slice.headerLabel).toBe('Vulnerabilities (2) · 1/1/0/0');
+    expect(slice.headerLabel).toBe('Vulnerabilities (2) · C/H/M/L');
   });
 
   it('links rows to the repo dependabot page', () => {

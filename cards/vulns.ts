@@ -98,16 +98,13 @@ function derive(data: VulnsData, _stored: undefined, _now: number, config?: Conf
 
   const total = filtered.reduce((n, r) => n + r.alerts.length, 0);
   const criticals = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'CRITICAL').length, 0);
-  const highs = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'HIGH').length, 0);
-  const moderates = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'MODERATE').length, 0);
-  const lows = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'LOW').length, 0);
 
   return {
     slice: {
       status: rows.length ? 'ok' : 'empty',
       emptyText: 'No open alerts',
       headerHref: 'https://github.com/notifications?query=is%3Arepository-vulnerability-alert',
-      headerLabel: `Vulnerabilities (${total}) · ${criticals}/${highs}/${moderates}/${lows}`,
+      headerLabel: `Vulnerabilities (${total}) · C/H/M/L`,
       items: rows,
       tile: {
         n: total,

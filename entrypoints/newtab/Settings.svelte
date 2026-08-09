@@ -3,6 +3,7 @@
   import { configItem } from '../../lib/storage';
   import RepoListEditor from '../../components/kit/RepoListEditor.svelte';
   import { untrack } from 'svelte';
+  import { browser } from '#imports';
 
   let { config, onclose }: { config: Config; onclose: () => void } = $props();
 
@@ -36,6 +37,7 @@
         stars: { trackedRepos: $state.snapshot(trackedRepos) },
       },
     });
+    void browser.runtime.sendMessage({ type: 'refresh' });
     onclose();
   }
 </script>
