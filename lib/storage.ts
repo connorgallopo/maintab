@@ -1,13 +1,34 @@
 import { storage } from '#imports';
 import type { Config, ModulesState, ModuleDef, SyncState } from './types';
 
+export const CONFIG_DEFAULTS: { modules: Config['modules'] } = {
+  modules: {
+    prs: { ignoredRepos: [], includeReviewRequests: true, rowCap: 8, staleDays: 0 },
+    vulns: { ignoredRepos: [] },
+    stars: { trackedRepos: [] },
+  },
+};
+
 export const configItem = storage.defineItem<Config>('local:config', {
-  version: 1,
+  version: 2,
   fallback: {
     pat: '',
     pollMinutes: 5,
     themePin: 'system',
-    modules: { stars: { trackedRepos: [] } },
+    modules: CONFIG_DEFAULTS.modules,
+  },
+  migrations: {
+    2: (old: {
+      pat: string; pollMinutes: number; themePin: Config['themePin'];
+      modules: { stars: { trackedRepos: string[] } };
+    }): Config => ({
+      ...old,
+      modules: {
+        prs: CONFIG_DEFAULTS.modules.prs,
+        vulns: CONFIG_DEFAULTS.modules.vulns,
+        stars: old.modules.stars,
+      },
+    }),
   },
 });
 

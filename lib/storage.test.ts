@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
-import { configItem, syncItem, modulesItem, migrateModules } from './storage';
+import { storage } from '#imports';
+import { configItem, syncItem, modulesItem, migrateModules, CONFIG_DEFAULTS } from './storage';
 import type { ModuleDef } from './types';
 
 describe('storage', () => {
@@ -34,5 +35,24 @@ describe('storage', () => {
     const def = { id: 'prs', version: 1 } as unknown as ModuleDef;
     const state = { prs: { v: 1, slice: { status: 'ok' } as never, data: { a: 1 } } };
     expect(migrateModules(state, [def]).prs.data).toEqual({ a: 1 });
+  });
+
+  it('migrates v1 config to v2 with module defaults', async () => {
+    interface ConfigV1 {
+      pat: string; pollMinutes: number; themePin: 'system' | 'light' | 'dark';
+      modules: { stars: { trackedRepos: string[] } };
+    }
+    const v1 = storage.defineItem<ConfigV1>('local:config', {
+      version: 1,
+      fallback: { pat: '', pollMinutes: 5, themePin: 'system', modules: { stars: { trackedRepos: [] } } },
+    });
+    await v1.setValue({ pat: 'tok', pollMinutes: 10, themePin: 'dark', modules: { stars: { trackedRepos: ['a/b'] } } });
+    await configItem.migrate();
+    const migrated = await configItem.getValue();
+    expect(migrated.pat).toBe('tok');
+    expect(migrated.pollMinutes).toBe(10);
+    expect(migrated.modules.stars.trackedRepos).toEqual(['a/b']);
+    expect(migrated.modules.prs).toEqual(CONFIG_DEFAULTS.modules.prs);
+    expect(migrated.modules.vulns).toEqual({ ignoredRepos: [] });
   });
 });

@@ -30,7 +30,7 @@ function map(resp: unknown, _prev: StarsData | undefined, config?: Config): Star
   return out;
 }
 
-function derive(data: StarsData, stored: StarsStored | undefined, now: number): { slice: Slice; stored: StarsStored } {
+function derive(data: StarsData, stored: StarsStored | undefined, now: number, _config?: Config): { slice: Slice; stored: StarsStored } {
   const history: StarsStored['history'] = {};
   const items = Object.entries(data).map(([repo, count]) => {
     const prev = stored?.history[repo] ?? [];

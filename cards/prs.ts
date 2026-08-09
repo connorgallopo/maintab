@@ -64,7 +64,7 @@ function map(resp: unknown, _prev: PrsData | undefined, _config?: Config): PrsDa
   };
 }
 
-function derive(data: PrsData, stored: PrsStored | undefined, now: number): { slice: Slice; stored: PrsStored } {
+function derive(data: PrsData, stored: PrsStored | undefined, now: number, _config?: Config): { slice: Slice; stored: PrsStored } {
   const seen: PrsStored['seen'] = {};
   let touched = 0;
   const items: RowItem[] = data.prs.map((pr) => {

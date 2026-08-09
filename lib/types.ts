@@ -1,4 +1,4 @@
-export type Tone = 'accent' | 'crit' | 'warn' | 'good' | 'dim';
+export type Tone = 'accent' | 'crit' | 'warn' | 'good' | 'dim' | 'mid';
 
 export interface RowItem {
   id: string;
@@ -9,6 +9,7 @@ export interface RowItem {
   spark?: number[];
   value?: string;
   delta?: string;
+  counts?: { value: number; tone: Tone }[];
 }
 
 export interface Tile {
@@ -32,7 +33,11 @@ export interface Config {
   pat: string;
   pollMinutes: number;
   themePin: 'system' | 'light' | 'dark';
-  modules: { stars: { trackedRepos: string[] } };
+  modules: {
+    prs: { ignoredRepos: string[]; includeReviewRequests: boolean; rowCap: number; staleDays: number };
+    vulns: { ignoredRepos: string[] };
+    stars: { trackedRepos: string[] };
+  };
 }
 
 export interface SyncState {
@@ -66,5 +71,5 @@ export interface ModuleDef<Data = unknown, Stored = unknown> {
     map: (resp: unknown, prev: Data | undefined, config?: Config) => Data & { nextCursor?: string | null };
   };
   fetchData?: (ctx: FetchCtx, stored: Stored | undefined, now: number) => Promise<Data>;
-  derive: (data: Data, stored: Stored | undefined, now: number) => { slice: Slice; stored: Stored };
+  derive: (data: Data, stored: Stored | undefined, now: number, config?: Config) => { slice: Slice; stored: Stored };
 }

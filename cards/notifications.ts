@@ -1,4 +1,4 @@
-import type { FetchCtx, ModuleDef, Slice } from '../lib/types';
+import type { Config, FetchCtx, ModuleDef, Slice } from '../lib/types';
 import * as github from '../lib/github';
 import { configItem, modulesItem } from '../lib/storage';
 
@@ -60,7 +60,7 @@ async function fetchData(ctx: FetchCtx, stored: NotifStored | undefined, now: nu
   return { threads, changed: true, lastModified: res.lastModified, pollInterval: res.pollInterval ?? 60 };
 }
 
-function derive(data: NotifData, stored: NotifStored | undefined, now: number): { slice: Slice; stored: NotifStored } {
+function derive(data: NotifData, stored: NotifStored | undefined, now: number, _config?: Config): { slice: Slice; stored: NotifStored } {
   const reviews = data.threads.filter((t) => t.reason === 'review requested').length;
   const nextStored: NotifStored = {
     lastModified: data.changed ? (data.lastModified ?? null) : (stored?.lastModified ?? null),

@@ -52,7 +52,7 @@ async function cycle(now: number): Promise<CycleStatus> {
 
     const next: ModulesState = {};
     for (const m of MODULES) {
-      const r = m.derive(acc[m.id] as never, stored[m.id]?.data as never, now);
+      const r = m.derive(acc[m.id] as never, stored[m.id]?.data as never, now, config);
       next[m.id] = { v: m.version, slice: r.slice, data: r.stored };
     }
     await modulesItem.setValue(next);

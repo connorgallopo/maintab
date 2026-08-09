@@ -64,7 +64,7 @@ function map(resp: unknown, prev: VulnsData | undefined, _config?: Config): Vuln
   };
 }
 
-function derive(data: VulnsData, _stored: undefined, _now: number): { slice: Slice; stored: undefined } {
+function derive(data: VulnsData, _stored: undefined, _now: number, _config?: Config): { slice: Slice; stored: undefined } {
   const rows = data.repos.flatMap((r) =>
     [...r.alerts]
       .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity))
