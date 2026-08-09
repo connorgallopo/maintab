@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A new tab page for GitHub maintainers.",
   "license": "MIT",
+  "private": true,
   "repository": "github:connorgallopo/maintab",
   "scripts": {
     "dev": "wxt",
