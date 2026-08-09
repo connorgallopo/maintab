@@ -61,7 +61,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Set version from tag
-        run: npm pkg set version="${GITHUB_REF_NAME#v}"
+        run: node -e "const f='./package.json',fs=require('fs'),p=JSON.parse(fs.readFileSync(f));p.version=process.env.GITHUB_REF_NAME.replace(/^v/,'');fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
 
       - name: Build and zip
         run: pnpm zip
