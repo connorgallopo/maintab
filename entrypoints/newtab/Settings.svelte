@@ -2,13 +2,14 @@
   import type { Config } from '../../lib/types';
   import { configItem } from '../../lib/storage';
   import { parseRepo } from '../../lib/repos';
+  import { untrack } from 'svelte';
 
   let { config, onclose }: { config: Config; onclose: () => void } = $props();
 
-  let pat = $state(config.pat);
-  let pollMinutes = $state(config.pollMinutes);
-  let themePin = $state(config.themePin);
-  let repos = $state([...config.modules.stars.trackedRepos]);
+  let pat = $state(untrack(() => config.pat));
+  let pollMinutes = $state(untrack(() => config.pollMinutes));
+  let themePin = $state(untrack(() => config.themePin));
+  let repos = $state(untrack(() => [...config.modules.stars.trackedRepos]));
   let newRepo = $state('');
   let repoError = $state('');
 
