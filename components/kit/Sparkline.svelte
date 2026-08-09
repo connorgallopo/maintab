@@ -14,7 +14,7 @@
 
 {#if path}
   <svg width={W} height={H} viewBox="0 0 {W} {H}" aria-hidden="true">
-    <polyline {path} points={path} fill="none" stroke="var(--accent)" stroke-width="2" />
+    <polyline points={path} fill="none" stroke="var(--accent)" stroke-width="2" />
   </svg>
 {:else}
   <span class="flat">collecting</span>
