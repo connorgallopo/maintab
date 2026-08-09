@@ -46,7 +46,7 @@ interface VulnsResp {
   };
 }
 
-function map(resp: unknown, prev: VulnsData | undefined): VulnsData {
+function map(resp: unknown, prev: VulnsData | undefined, _config: Config): VulnsData {
   const conn = (resp as VulnsResp).viewer.repositories;
   const fresh: RepoAlerts[] = conn.nodes
     .filter((n) => n.vulnerabilityAlerts.totalCount > 0)

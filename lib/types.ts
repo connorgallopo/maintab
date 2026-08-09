@@ -63,7 +63,7 @@ export interface ModuleDef<Data = unknown, Stored = unknown> {
   migrate?: (old: unknown, oldVersion: number) => Stored;
   graphql?: {
     fragment: (config: Config, cursor: string | null) => string;
-    map: (resp: unknown, prev: Data | undefined) => Data & { nextCursor?: string | null };
+    map: (resp: unknown, prev: Data | undefined, config: Config) => Data & { nextCursor?: string | null };
   };
   fetchData?: (ctx: FetchCtx, stored: Stored | undefined, now: number) => Promise<Data>;
   derive: (data: Data, stored: Stored | undefined, now: number) => { slice: Slice; stored: Stored };

@@ -49,7 +49,7 @@ interface PrsResp {
   };
 }
 
-function map(resp: unknown): PrsData {
+function map(resp: unknown, _prev: PrsData | undefined, _config: Config): PrsData {
   const conn = (resp as PrsResp).viewer.pullRequests;
   return {
     totalCount: conn.totalCount,
