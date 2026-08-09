@@ -6,6 +6,7 @@
   "private": true,
   "repository": "github:connorgallopo/maintab",
   "scripts": {
+    "postinstall": "wxt prepare",
     "dev": "wxt",
     "build": "wxt build -b firefox",
     "zip": "wxt zip -b firefox",
