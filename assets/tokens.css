@@ -1,0 +1,39 @@
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+:root {
+  --bg: #faf7f2; --card: #ffffff; --border: #e4ded4; --hair: #efe9df;
+  --ink: #1a1815; --sub: #6f6a61; --dim: #a09a8e;
+  --accent: #1f4fd8; --accent-ink: #ffffff;
+  --crit: #b3261e; --warn: #9a6a00; --good: #2e6e33;
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141416; --card: #1d1d1f; --border: #2d2d30; --hair: #28282b;
+    --ink: #ececec; --sub: #98989d; --dim: #6e6e73;
+    --accent: #7d9bf7; --accent-ink: #101216;
+    --crit: #ef8578; --warn: #d4a95c; --good: #8fba85;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #141416; --card: #1d1d1f; --border: #2d2d30; --hair: #28282b;
+  --ink: #ececec; --sub: #98989d; --dim: #6e6e73;
+  --accent: #7d9bf7; --accent-ink: #101216;
+  --crit: #ef8578; --warn: #d4a95c; --good: #8fba85;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 14px;
+  min-height: 100vh;
+}
