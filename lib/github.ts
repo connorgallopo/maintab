@@ -56,3 +56,12 @@ export async function restGet(
     pollInterval: poll ? Number(poll) : null,
   };
 }
+
+export async function restPatch(pat: string, path: string): Promise<number> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'PATCH',
+    headers: { authorization: `Bearer ${pat}`, accept: 'application/vnd.github+json' },
+  });
+  throwForStatus(res);
+  return res.status;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { graphql, restGet, GhAuthError, GhRateLimitError } from './github';
+import { graphql, restGet, restPatch, GhAuthError, GhRateLimitError } from './github';
 
 function mockFetch(status: number, body: unknown, headers: Record<string, string> = {}) {
   return vi.stubGlobal('fetch', vi.fn(async () => new Response(
@@ -56,5 +56,17 @@ describe('restGet', () => {
     const res = await restGet('tok', '/notifications', { ifModifiedSince: 'x' });
     expect(res.status).toBe(304);
     expect(res.json).toBeNull();
+  });
+});
+
+describe('restPatch', () => {
+  it('sends PATCH with auth and returns the status', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 205 })));
+    const status = await restPatch('tok', '/notifications/threads/9');
+    expect(status).toBe(205);
+    const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('https://api.github.com/notifications/threads/9');
+    expect(call[1].method).toBe('PATCH');
+    expect(call[1].headers.authorization).toBe('Bearer tok');
   });
 });
