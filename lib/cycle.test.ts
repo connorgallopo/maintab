@@ -71,6 +71,15 @@ describe('runCycle', () => {
     expect(sync.inFlightSince).toBe(0);
   });
 
+  it('backs off generic errors instead of retrying every tick', async () => {
+    const spy = vi.spyOn(github, 'graphql').mockRejectedValue(new Error('boom'));
+    expect(await runCycle(NOW)).toBe('error');
+    const sync = await syncItem.getValue();
+    expect(sync.backoffUntil).toBe(NOW + 60_000);
+    expect(await runCycle(NOW + 1000)).toBe('backoff');
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it('flags auth errors and keeps old module data', async () => {
     stubGithub();
     await runCycle(NOW);

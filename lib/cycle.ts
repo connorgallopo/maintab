@@ -74,7 +74,7 @@ async function cycle(now: number): Promise<CycleStatus> {
       await syncItem.setValue({ ...patch, authError: true });
       return 'auth-error';
     }
-    await syncItem.setValue(patch);
+    await syncItem.setValue({ ...patch, backoffUntil: now + 60_000 });
     return 'error';
   }
 }
