@@ -39,3 +39,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Build (Chrome)
+        run: pnpm build:chrome

@@ -24,6 +24,8 @@ pnpm build
 
 Then open `about:debugging#/runtime/this-firefox` in Firefox, choose "Load Temporary Add-on", and select any file inside `.output/firefox-mv2`.
 
+For Chrome, build with `pnpm build:chrome` instead. Open `chrome://extensions`, enable Developer mode, choose "Load unpacked", and select the `.output/chrome-mv3` folder.
+
 ## Token setup
 
 maintab needs a classic personal access token with the `repo`, `notifications`, and `security_events` scopes. Fine-grained tokens won't work here: GitHub's notifications API doesn't accept them, classic scopes only.
