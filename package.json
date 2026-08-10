@@ -9,7 +9,9 @@
     "postinstall": "wxt prepare",
     "dev": "wxt",
     "build": "wxt build -b firefox",
+    "build:chrome": "wxt build -b chrome",
     "zip": "wxt zip -b firefox",
+    "zip:chrome": "wxt zip -b chrome",
     "test": "vitest run --passWithNoTests",
     "check": "bash scripts/check-modules.sh && vitest run"
   },

@@ -20,7 +20,9 @@ export default defineBackground(() => {
     if (alarm.name === 'poll') void runCycle();
   });
   browser.runtime.onMessage.addListener((msg: { type?: string }) => {
-    if (msg?.type === 'refresh') void runCycle();
+    // Returning the promise (not voiding it) keeps the MV3 service worker
+    // alive until runCycle settles, via the webextension-polyfill response.
+    if (msg?.type === 'refresh') return runCycle();
   });
   configItem.watch(() => void schedule());
 });
