@@ -19,12 +19,18 @@ function buildQuery(config: Config, only?: { fragment: (c: Config, cur: string |
 export type CycleStatus = 'ok' | 'no-token' | 'backoff' | 'in-flight' | 'auth-error' | 'error';
 
 async function cycle(now: number): Promise<CycleStatus> {
-  const config = await configItem.getValue();
-  if (!config.pat) return 'no-token';
-  const sync = await syncItem.getValue();
-  if (sync.backoffUntil > now) return 'backoff';
-  if (sync.inFlightSince && now - sync.inFlightSince < LOCK_TTL) return 'in-flight';
-  await syncItem.setValue({ ...sync, inFlightSince: now });
+  let config: Config;
+  try {
+    config = await configItem.getValue();
+    if (!config.pat) return 'no-token';
+    const sync = await syncItem.getValue();
+    if (sync.backoffUntil > now) return 'backoff';
+    if (sync.inFlightSince && now - sync.inFlightSince < LOCK_TTL) return 'in-flight';
+    await syncItem.setValue({ ...sync, inFlightSince: now });
+  } catch {
+    // Nothing was acquired yet, so there is no lock to release here.
+    return 'error';
+  }
 
   try {
     const stored = migrateModules(await modulesItem.getValue(), MODULES);

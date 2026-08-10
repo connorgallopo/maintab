@@ -19,10 +19,12 @@ export default defineBackground(() => {
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'poll') void runCycle();
   });
-  browser.runtime.onMessage.addListener((msg: { type?: string }) => {
-    // Returning the promise (not voiding it) keeps the MV3 service worker
-    // alive until runCycle settles, via the webextension-polyfill response.
-    if (msg?.type === 'refresh') return runCycle();
+  browser.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendResponse) => {
+    // Chrome needs `return true` to hold the message channel open for an
+    // async sendResponse; promise-returning listeners are Chrome 148+ and still rolling out.
+    if (msg?.type !== 'refresh') return;
+    void runCycle().then(sendResponse);
+    return true;
   });
   configItem.watch(() => void schedule());
 });

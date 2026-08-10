@@ -63,6 +63,13 @@ describe('runCycle', () => {
     expect(github.graphql).not.toHaveBeenCalled();
   });
 
+  it('resolves to error without mutating storage when a pre-flight read throws', async () => {
+    vi.spyOn(configItem, 'getValue').mockRejectedValue(new Error('Extension context invalidated'));
+    const before = await syncItem.getValue();
+    expect(await runCycle(NOW)).toBe('error');
+    expect(await syncItem.getValue()).toEqual(before);
+  });
+
   it('persists backoff from a rate limit error', async () => {
     vi.spyOn(github, 'graphql').mockRejectedValue(new github.GhRateLimitError(NOW + 120_000));
     expect(await runCycle(NOW)).toBe('error');
