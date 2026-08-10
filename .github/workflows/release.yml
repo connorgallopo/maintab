@@ -87,3 +87,16 @@ jobs:
           files: |
             .output/*-firefox.zip
             .output/*-sources.zip
+
+      - name: Submit to AMO
+        if: ${{ env.FIREFOX_JWT_ISSUER != '' }}
+        env:
+          FIREFOX_EXTENSION_ID: maintab@connorgallopo.github.io
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+          FIREFOX_CHANNEL: unlisted
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          pnpm wxt submit \
+            --firefox-zip ".output/maintab-${VERSION}-firefox.zip" \
+            --firefox-sources-zip ".output/maintab-${VERSION}-sources.zip"
