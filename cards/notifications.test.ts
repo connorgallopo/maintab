@@ -83,7 +83,7 @@ describe('derive', () => {
     ];
     const { slice } = notificationsModule.derive({ threads, changed: true }, undefined, NOW);
     expect(slice.tile).toMatchObject({ n: 2, note: '1 review request' });
-    expect(slice.items[0].badge).toEqual({ kind: 'tag', text: 'review requested', tone: 'dim' });
+    expect(slice.items[0]!.badge).toEqual({ kind: 'tag', text: 'review requested', tone: 'dim' });
     expect(slice.headerHref).toBe('https://github.com/notifications');
   });
 
@@ -108,8 +108,8 @@ describe('markRead', () => {
     await markRead('9');
     expect(spy).toHaveBeenCalledWith('tok', '/notifications/threads/9');
     const state = await modulesItem.getValue();
-    expect(state.notifications.slice.items.map((i) => i.id)).toEqual(['10']);
-    expect((state.notifications.data as { threads: unknown[] }).threads).toHaveLength(1);
+    expect(state.notifications!.slice.items.map((i) => i.id)).toEqual(['10']);
+    expect((state.notifications!.data as { threads: unknown[] }).threads).toHaveLength(1);
     spy.mockRestore();
   });
 
@@ -121,7 +121,7 @@ describe('markRead', () => {
     await modulesItem.setValue({ notifications: { v: 1, slice, data: stored } });
     await expect(markRead('9')).rejects.toThrow('down');
     const state = await modulesItem.getValue();
-    expect(state.notifications.slice.items).toHaveLength(1);
+    expect(state.notifications!.slice.items).toHaveLength(1);
     spy.mockRestore();
   });
 });

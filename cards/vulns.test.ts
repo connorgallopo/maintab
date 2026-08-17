@@ -48,8 +48,8 @@ describe('derive', () => {
     ]), undefined);
     const { slice } = vulnsModule.derive(data, undefined, NOW);
     expect(slice.items).toHaveLength(1);
-    expect(slice.items[0].id).toBe('cgallopo/widgetlib');
-    expect(slice.items[0].counts).toEqual([
+    expect(slice.items[0]!.id).toBe('cgallopo/widgetlib');
+    expect(slice.items[0]!.counts).toEqual([
       { value: 1, tone: 'crit' },
       { value: 1, tone: 'warn' },
       { value: 1, tone: 'mid' },
@@ -140,7 +140,7 @@ describe('derive', () => {
   it('links rows to the repo dependabot page', () => {
     const data = vulnsModule.graphql!.map(resp([repo('widgetlib', [{ severity: 'HIGH', pkg: 'undici' }])]), undefined);
     const { slice } = vulnsModule.derive(data, undefined, NOW);
-    expect(slice.items[0].href).toBe('https://github.com/cgallopo/widgetlib/security/dependabot');
+    expect(slice.items[0]!.href).toBe('https://github.com/cgallopo/widgetlib/security/dependabot');
   });
 
   it('empty state when nothing is vulnerable', () => {

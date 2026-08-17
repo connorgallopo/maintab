@@ -27,14 +27,14 @@ describe('storage', () => {
       prs: { v: 1, slice: { status: 'ok' } as never, data: { legacy: 1 } },
     };
     const next = migrateModules(state, [def]);
-    expect(next.prs.v).toBe(2);
-    expect(next.prs.data).toEqual({ upgraded: true, from: { legacy: 1 } });
+    expect(next.prs!.v).toBe(2);
+    expect(next.prs!.data).toEqual({ upgraded: true, from: { legacy: 1 } });
   });
 
   it('leaves current-version slices alone', () => {
     const def = { id: 'prs', version: 1 } as unknown as ModuleDef;
     const state = { prs: { v: 1, slice: { status: 'ok' } as never, data: { a: 1 } } };
-    expect(migrateModules(state, [def]).prs.data).toEqual({ a: 1 });
+    expect(migrateModules(state, [def]).prs!.data).toEqual({ a: 1 });
   });
 
   it('migrates v1 config to v2 with module defaults', async () => {

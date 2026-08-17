@@ -13,7 +13,8 @@
     "zip": "wxt zip -b firefox",
     "zip:chrome": "wxt zip -b chrome",
     "test": "vitest run --passWithNoTests",
-    "check": "bash scripts/check-modules.sh && vitest run"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "bash scripts/check-modules.sh && tsc --noEmit -p tsconfig.json && vitest run"
   },
   "devEngines": {
     "packageManager": {

@@ -114,6 +114,6 @@ describe('runCycle', () => {
     vi.spyOn(github, 'restGet').mockResolvedValue({ status: 200, json: [], lastModified: null, pollInterval: 60 });
     expect(await runCycle(NOW)).toBe('ok');
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(spy.mock.calls[1][1]).toContain('after: "c1"');
+    expect(spy.mock.calls[1]![1]).toContain('after: "c1"');
   });
 });

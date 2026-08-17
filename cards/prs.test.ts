@@ -101,13 +101,13 @@ describe('map', () => {
 
   it('parses updatedAt to epoch ms', () => {
     const d = prsModule.graphql!.map(resp([node('a', { updatedAt: '2024-01-01T00:00:00Z' })], 1), undefined);
-    expect(d.prs[0].updatedAt).toBe(Date.parse('2024-01-01T00:00:00Z'));
+    expect(d.prs[0]!.updatedAt).toBe(Date.parse('2024-01-01T00:00:00Z'));
   });
 
   it('sums comments and reviews into commentTotal', () => {
     const n = node('a', { comments: { totalCount: 3 }, reviews: { totalCount: 2 } });
     const d = prsModule.graphql!.map(resp([n], 1), undefined);
-    expect(d.prs[0].commentTotal).toBe(5);
+    expect(d.prs[0]!.commentTotal).toBe(5);
   });
 });
 
@@ -145,13 +145,13 @@ describe('review rows', () => {
     const d = data([pr('shared')], [rev('shared'), rev('other')]);
     const { slice } = prsModule.derive(d, undefined, NOW);
     expect(slice.items.map((i) => i.id)).toEqual(['shared', 'other']);
-    expect(slice.items[0].badge).toBeUndefined();
+    expect(slice.items[0]!.badge).toBeUndefined();
   });
 
   it('carry a review tag and never an unread pill', () => {
     const d = data([], [rev('r1')]);
     const { slice } = prsModule.derive(d, undefined, NOW);
-    expect(slice.items[0].badge).toEqual({ kind: 'tag', text: 'review', tone: 'accent' });
+    expect(slice.items[0]!.badge).toEqual({ kind: 'tag', text: 'review', tone: 'accent' });
   });
 });
 
@@ -191,23 +191,23 @@ describe('rows and header label', () => {
 describe('seen markers', () => {
   it('first sight of a PR shows no unread and records a marker', () => {
     const { slice, stored } = prsModule.derive(data([pr('a', { commentTotal: 4 })]), undefined, NOW);
-    expect(slice.items[0].badge).toBeUndefined();
-    expect(stored.seen.a.commentTotal).toBe(4);
+    expect(slice.items[0]!.badge).toBeUndefined();
+    expect(stored.seen.a!.commentTotal).toBe(4);
   });
 
   it('new comments since marker show as unread', () => {
     const stored = { seen: { a: { commentTotal: 4, seenAt: NOW } } };
     const { slice } = prsModule.derive(data([pr('a', { commentTotal: 7 })]), stored, NOW);
-    expect(slice.items[0].badge).toEqual({ kind: 'pill', text: '3 new', tone: 'accent' });
+    expect(slice.items[0]!.badge).toEqual({ kind: 'pill', text: '3 new', tone: 'accent' });
   });
 
   it('clamps the marker down when comments were deleted', () => {
     const stored = { seen: { a: { commentTotal: 10, seenAt: NOW } } };
     const first = prsModule.derive(data([pr('a', { commentTotal: 9 })]), stored, NOW);
-    expect(first.slice.items[0].badge).toBeUndefined();
-    expect(first.stored.seen.a.commentTotal).toBe(9);
+    expect(first.slice.items[0]!.badge).toBeUndefined();
+    expect(first.stored.seen.a!.commentTotal).toBe(9);
     const second = prsModule.derive(data([pr('a', { commentTotal: 10 })]), first.stored, NOW);
-    expect(second.slice.items[0].badge?.text).toBe('1 new');
+    expect(second.slice.items[0]!.badge?.text).toBe('1 new');
   });
 
   it('prunes markers for PRs no longer open', () => {
@@ -225,8 +225,8 @@ describe('seen markers', () => {
     );
     expect(hidden.stored.seen.a).toBeUndefined();
     const back = prsModule.derive(data([pr('a', { repo: 'cgallopo/ignored', commentTotal: 9 })]), hidden.stored, NOW);
-    expect(back.slice.items[0].badge).toBeUndefined();
-    expect(back.stored.seen.a.commentTotal).toBe(9);
+    expect(back.slice.items[0]!.badge).toBeUndefined();
+    expect(back.stored.seen.a!.commentTotal).toBe(9);
   });
 
   it('are never recorded for review rows', () => {
@@ -289,9 +289,9 @@ describe('markSeen', () => {
     await modulesItem.setValue({ prs: { v: 1, slice, data: stored } });
     await markSeen('a');
     const state = await modulesItem.getValue();
-    const d = state.prs.data as { seen: Record<string, { commentTotal: number }> };
-    expect(d.seen.a.commentTotal).toBe(6);
-    expect(state.prs.slice.items[0].badge).toBeUndefined();
+    const d = state.prs!.data as { seen: Record<string, { commentTotal: number }> };
+    expect(d.seen.a!.commentTotal).toBe(6);
+    expect(state.prs!.slice.items[0]!.badge).toBeUndefined();
   });
 
   it('leaves a review-tagged row untouched, without writing a marker', async () => {
@@ -300,9 +300,9 @@ describe('markSeen', () => {
     await modulesItem.setValue({ prs: { v: 1, slice, data: stored } });
     await markSeen('r');
     const state = await modulesItem.getValue();
-    const d = state.prs.data as PrsStored;
+    const d = state.prs!.data as PrsStored;
     expect(d.seen.r).toBeUndefined();
     expect(d.seen.a).toEqual({ commentTotal: 1, seenAt: NOW });
-    expect(state.prs.slice.items[0].badge).toEqual({ kind: 'tag', text: 'review', tone: 'accent' });
+    expect(state.prs!.slice.items[0]!.badge).toEqual({ kind: 'tag', text: 'review', tone: 'accent' });
   });
 });

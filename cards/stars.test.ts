@@ -46,7 +46,7 @@ describe('derive', () => {
       'cgallopo/gone': [{ t: NOW - HOUR, c: 5 }],
     } };
     const { stored: next } = starsModule.derive({ 'cgallopo/widgetlib': 1204 }, stored, NOW);
-    expect(next.history['cgallopo/widgetlib'].every((p) => p.t >= NOW - 90 * DAY)).toBe(true);
+    expect(next.history['cgallopo/widgetlib']!.every((p) => p.t >= NOW - 90 * DAY)).toBe(true);
     expect(next.history['cgallopo/gone']).toBeUndefined();
   });
 
@@ -57,10 +57,10 @@ describe('derive', () => {
       { history: { 'cgallopo/widgetlib': history } },
       NOW,
     );
-    expect(slice.items[0].value).toBe('1,204');
-    expect(slice.items[0].delta).toBe('+38');
-    expect(slice.items[0].spark!.length).toBeGreaterThan(2);
-    expect(slice.items[0].href).toBe('https://github.com/cgallopo/widgetlib');
+    expect(slice.items[0]!.value).toBe('1,204');
+    expect(slice.items[0]!.delta).toBe('+38');
+    expect(slice.items[0]!.spark!.length).toBeGreaterThan(2);
+    expect(slice.items[0]!.href).toBe('https://github.com/cgallopo/widgetlib');
   });
 
   it('empty state with no tracked repos', () => {
