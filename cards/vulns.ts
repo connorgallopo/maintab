@@ -1,92 +1,85 @@
-import type { Config, ModuleDef, Slice, Tone } from '../lib/types';
+import type { Config, ModuleDef, RepoCtx, RepoNode, RowItem, Severity, Slice, Tone } from '../lib/types';
+import { applySeen, pillFor, type SeenStore } from '../lib/seen';
 
-const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MODERATE', 'LOW'] as const;
-type Severity = (typeof SEVERITY_ORDER)[number];
-
+const SEVERITY_ORDER: readonly Severity[] = ['CRITICAL', 'HIGH', 'MODERATE', 'LOW'];
 const TONE_ORDER: readonly Tone[] = ['crit', 'warn', 'mid', 'dim'];
+const RANK: Record<Severity, number> = { LOW: 0, MODERATE: 1, HIGH: 2, CRITICAL: 3 };
 
 export interface RepoAlerts {
   repo: string;
   url: string;
-  alerts: { severity: Severity; pkg: string }[];
+  total: number;
+  counts: [number, number, number, number];
+  newestAt: number;
 }
 
 export interface VulnsData {
   repos: RepoAlerts[];
-  nextCursor?: string | null;
 }
 
-function fragment(_config: Config, cursor: string | null): string {
-  const after = cursor ? `, after: "${cursor}"` : '';
-  return `viewer {
-    repositories(ownerAffiliations: [OWNER], isArchived: false, first: 100${after}) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        nameWithOwner url
-        vulnerabilityAlerts(states: OPEN, first: 100) {
-          totalCount
-          nodes { securityVulnerability { severity package { name } } }
-        }
-      }
+export type VulnsStored = SeenStore;
+
+function repoFields(_config: Config): string {
+  return `vulnAlerts: vulnerabilityAlerts(states: [OPEN], first: 100) {
+  totalCount
+  nodes { number createdAt securityVulnerability { severity package { name } } }
+}`;
+}
+
+interface AlertNode {
+  number: number;
+  createdAt: string;
+  securityVulnerability: { severity: string; package: { name: string } } | null;
+}
+
+type VulnRepoNode = RepoNode & { vulnAlerts: { totalCount: number; nodes: AlertNode[] } | null };
+
+function rank(severity: string): number {
+  return RANK[severity as Severity] ?? 0;
+}
+
+function mapRepos(repos: RepoNode[], _prev: VulnsData | undefined, ctx: RepoCtx): VulnsData {
+  const min = RANK[ctx.config.modules.vulns.minSeverity];
+  const out: RepoAlerts[] = [];
+  for (const r of repos as VulnRepoNode[]) {
+    const conn = r.vulnAlerts;
+    if (!conn || conn.totalCount === 0) continue;
+    const counts: [number, number, number, number] = [0, 0, 0, 0];
+    let kept = 0;
+    let newestAt = 0;
+    for (const a of conn.nodes) {
+      const severity = a.securityVulnerability?.severity ?? 'LOW';
+      if (rank(severity) < min) continue;
+      kept += 1;
+      const idx = SEVERITY_ORDER.indexOf(severity as Severity);
+      const slot = idx >= 0 ? idx : 3;
+      counts[slot] = (counts[slot] ?? 0) + 1;
+      newestAt = Math.max(newestAt, Date.parse(a.createdAt));
     }
-  }`;
+    if (kept === 0) continue;
+    out.push({ repo: r.nameWithOwner, url: r.url, total: min === 0 ? conn.totalCount : kept, counts, newestAt });
+  }
+  return { repos: out };
 }
 
-interface VulnsResp {
-  viewer: {
-    repositories: {
-      pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: {
-        nameWithOwner: string;
-        url: string;
-        vulnerabilityAlerts: {
-          totalCount: number;
-          nodes: { securityVulnerability: { severity: Severity; package: { name: string } } }[];
-        };
-      }[];
-    };
-  };
-}
+function derive(data: VulnsData, stored: VulnsStored | undefined, now: number, _config?: Config): { slice: Slice; stored: VulnsStored } {
+  const repos = data.repos;
+  const { marks, next } = applySeen(
+    stored,
+    repos.map((r) => ({ id: r.repo, total: r.total, createdAt: r.newestAt, flagNew: true })),
+    now,
+  );
 
-function map(resp: unknown, prev: VulnsData | undefined, _config?: Config): VulnsData {
-  const conn = (resp as VulnsResp).viewer.repositories;
-  const fresh: RepoAlerts[] = conn.nodes
-    .filter((n) => n.vulnerabilityAlerts.totalCount > 0)
-    .map((n) => ({
-      repo: n.nameWithOwner,
-      url: n.url,
-      alerts: n.vulnerabilityAlerts.nodes.map((a) => ({
-        severity: a.securityVulnerability.severity,
-        pkg: a.securityVulnerability.package.name,
-      })),
-    }));
-  return {
-    repos: [...(prev?.repos ?? []), ...fresh],
-    nextCursor: conn.pageInfo.hasNextPage ? conn.pageInfo.endCursor : null,
-  };
-}
-
-function derive(data: VulnsData, _stored: undefined, _now: number, _config?: Config): { slice: Slice; stored: undefined } {
-  const filtered = data.repos;
-
-  const rows = filtered
-    .map((r) => {
-      const counts = [0, 0, 0, 0];
-      for (const alert of r.alerts) {
-        const idx = SEVERITY_ORDER.indexOf(alert.severity);
-        if (idx >= 0) counts[idx] = (counts[idx] ?? 0) + 1;
-      }
-      return {
-        id: r.repo,
-        href: `${r.url}/security/dependabot`,
-        repo: r.repo.split('/')[1],
-        primary: '',
-        counts: counts.map((value, i) => ({
-          value,
-          tone: value === 0 ? 'dim' : (TONE_ORDER[i] ?? 'dim'),
-        })),
-      };
-    })
+  const rows: RowItem[] = repos
+    .map((r) => ({
+      id: r.repo,
+      href: `${r.url}/security/dependabot`,
+      repo: r.repo.split('/')[1] ?? r.repo,
+      primary: '',
+      counts: r.counts.map((value, i) => ({ value, tone: value === 0 ? 'dim' : (TONE_ORDER[i] ?? 'dim') })),
+      pill: pillFor(marks[r.repo]),
+      mark: { total: r.total },
+    }))
     .sort((a, b) => {
       for (let i = 0; i < 4; i++) {
         const diff = (b.counts[i]?.value ?? 0) - (a.counts[i]?.value ?? 0);
@@ -95,8 +88,8 @@ function derive(data: VulnsData, _stored: undefined, _now: number, _config?: Con
       return 0;
     });
 
-  const total = filtered.reduce((n, r) => n + r.alerts.length, 0);
-  const criticals = filtered.reduce((n, r) => n + r.alerts.filter((a) => a.severity === 'CRITICAL').length, 0);
+  const total = repos.reduce((n, r) => n + r.total, 0);
+  const criticals = repos.reduce((n, r) => n + r.counts[0], 0);
 
   return {
     slice: {
@@ -108,18 +101,21 @@ function derive(data: VulnsData, _stored: undefined, _now: number, _config?: Con
       tile: {
         n: total,
         label: 'Vulnerabilities',
+        tone: criticals ? 'crit' : undefined,
         note: criticals ? `${criticals} critical` : undefined,
         noteTone: criticals ? 'crit' : undefined,
       },
     },
-    stored: undefined,
+    stored: next,
   };
 }
 
-export const vulnsModule: ModuleDef<VulnsData, undefined> = {
+export const vulnsModule: ModuleDef<VulnsData, VulnsStored> = {
   id: 'vulns',
   title: 'Vulnerabilities',
-  version: 1,
-  graphql: { fragment, map },
+  version: 2,
+  migrate: () => ({ baselineAt: Date.now(), seen: {} }),
+  repoFields,
+  mapRepos,
   derive,
 };
