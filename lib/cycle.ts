@@ -35,8 +35,11 @@ async function cycle(now: number): Promise<CycleStatus> {
     config = await configItem.getValue();
     if (!config.pat) return 'no-token';
     const sync = await syncItem.getValue();
-    if (sync.backoffUntil > now) return 'backoff';
     if (sync.inFlightSince && now - sync.inFlightSince < LOCK_TTL) return 'in-flight';
+    if (sync.backoffUntil > now) {
+      if (sync.inFlightSince) await syncItem.setValue({ ...sync, inFlightSince: 0 });
+      return 'backoff';
+    }
     await syncItem.setValue({ ...sync, inFlightSince: now });
   } catch {
     return 'error';

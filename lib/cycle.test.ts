@@ -111,6 +111,29 @@ describe('runCycle', () => {
     expect(github.graphql).not.toHaveBeenCalled();
   });
 
+  it('clears a stale lock while backing off, so the page stops showing sync', async () => {
+    stubGithub();
+    await syncItem.setValue({
+      ...(await syncItem.getValue()),
+      backoffUntil: NOW + 60_000,
+      inFlightSince: NOW - 300_000,
+    });
+    expect(await runCycle(NOW)).toBe('backoff');
+    expect((await syncItem.getValue()).inFlightSince).toBe(0);
+    expect(github.graphql).not.toHaveBeenCalled();
+  });
+
+  it('keeps a live lock even while backing off', async () => {
+    stubGithub();
+    await syncItem.setValue({
+      ...(await syncItem.getValue()),
+      backoffUntil: NOW + 60_000,
+      inFlightSince: NOW - 10_000,
+    });
+    expect(await runCycle(NOW)).toBe('in-flight');
+    expect((await syncItem.getValue()).inFlightSince).toBe(NOW - 10_000);
+  });
+
   it('resolves to error without mutating storage when a pre-flight read throws', async () => {
     vi.spyOn(configItem, 'getValue').mockRejectedValue(new Error('Extension context invalidated'));
     const before = await syncItem.getValue();
