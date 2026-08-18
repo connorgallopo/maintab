@@ -29,23 +29,63 @@ export interface Slice {
   tile?: Tile;
 }
 
+export type RepoAffiliation = 'OWNER' | 'COLLABORATOR' | 'ORGANIZATION_MEMBER';
+export type RepoPermission = 'ADMIN' | 'MAINTAIN' | 'WRITE' | 'TRIAGE' | 'READ';
+export type Severity = 'CRITICAL' | 'HIGH' | 'MODERATE' | 'LOW';
+
+export interface RepoScopeConfig {
+  affiliations: RepoAffiliation[];
+  minPermission: RepoPermission;
+  includeForks: boolean;
+  ignored: string[];
+  pinned: string[];
+}
+
 export interface Config {
   pat: string;
   pollMinutes: number;
   themePin: 'system' | 'light' | 'dark';
+  repos: RepoScopeConfig;
   modules: {
-    prs: { ignoredRepos: string[]; includeReviewRequests: boolean; rowCap: number; staleDays: number };
-    vulns: { ignoredRepos: string[] };
-    stars: { trackedRepos: string[] };
+    incoming: { enabled: boolean; rowCap: number };
+    prs: { enabled: boolean; rowCap: number; includeReviewRequests: boolean; staleDays: number };
+    issues: { enabled: boolean; rowCap: number; includeInvolved: boolean };
+    notifications: { enabled: boolean; rowCap: number; hideReasons: string[]; participatingOnly: boolean };
+    vulns: { enabled: boolean; minSeverity: Severity };
+    builds: { enabled: boolean };
+    stars: { enabled: boolean; trackedRepos: string[] };
   };
 }
+
+export type ModuleId = keyof Config['modules'];
 
 export interface SyncState {
   lastSyncAt: number;
   inFlightSince: number;
   backoffUntil: number;
-  pollIntervalHint: number;
   authError: boolean;
+  login: string;
+  lastError: 'auth' | 'rate-limit' | 'error' | null;
+}
+
+export interface RepoRef {
+  nameWithOwner: string;
+  url: string;
+  isPrivate: boolean;
+  viewerPermission: RepoPermission | null;
+}
+
+export interface ReposCache {
+  scopeKey: string;
+  discoveredAt: number;
+  refs: RepoRef[];
+}
+
+export type RepoNode = RepoRef & Record<string, unknown>;
+
+export interface RepoCtx {
+  config: Config;
+  login: string;
 }
 
 export interface ModuleState {
@@ -66,10 +106,12 @@ export interface ModuleDef<Data = unknown, Stored = unknown> {
   title: string;
   version: number;
   migrate?: (old: unknown, oldVersion: number) => Stored;
+  repoFields?: (config: Config) => string;
   graphql?: {
     fragment: (config: Config, cursor: string | null) => string;
     map: (resp: unknown, prev: Data | undefined, config?: Config) => Data & { nextCursor?: string | null };
   };
+  mapRepos?: (repos: RepoNode[], prev: Data | undefined, ctx: RepoCtx) => Data;
   fetchData?: (ctx: FetchCtx, stored: Stored | undefined, now: number) => Promise<Data>;
   derive: (data: Data, stored: Stored | undefined, now: number, config?: Config) => { slice: Slice; stored: Stored };
 }

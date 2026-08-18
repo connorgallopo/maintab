@@ -10,11 +10,10 @@
   let pat = $state(untrack(() => config.pat));
   let pollMinutes = $state(untrack(() => config.pollMinutes));
   let themePin = $state(untrack(() => config.themePin));
-  let prsIgnoredRepos = $state(untrack(() => [...config.modules.prs.ignoredRepos]));
+  let ignored = $state(untrack(() => [...config.repos.ignored]));
   let includeReviewRequests = $state(untrack(() => config.modules.prs.includeReviewRequests));
   let rowCap = $state(untrack(() => config.modules.prs.rowCap));
   let staleDays = $state(untrack(() => config.modules.prs.staleDays));
-  let vulnsIgnoredRepos = $state(untrack(() => [...config.modules.vulns.ignoredRepos]));
   let trackedRepos = $state(untrack(() => [...config.modules.stars.trackedRepos]));
 
   function clamp(value: number, min: number, max: number, fallback: number): number {
@@ -22,19 +21,22 @@
   }
 
   async function save() {
+    const base = $state.snapshot(config);
     await configItem.setValue({
+      ...base,
       pat: pat.trim(),
       pollMinutes: clamp(pollMinutes, 1, 60, 5),
       themePin,
+      repos: { ...base.repos, ignored: $state.snapshot(ignored) },
       modules: {
+        ...base.modules,
         prs: {
-          ignoredRepos: $state.snapshot(prsIgnoredRepos),
+          ...base.modules.prs,
           includeReviewRequests,
           rowCap: clamp(rowCap, 3, 20, 8),
           staleDays: clamp(staleDays, 0, 365, 0),
         },
-        vulns: { ignoredRepos: $state.snapshot(vulnsIgnoredRepos) },
-        stars: { trackedRepos: $state.snapshot(trackedRepos) },
+        stars: { ...base.modules.stars, trackedRepos: $state.snapshot(trackedRepos) },
       },
     });
     void browser.runtime.sendMessage({ type: 'refresh' });
@@ -68,7 +70,6 @@
 
   <fieldset>
     <legend>Pull requests</legend>
-    <RepoListEditor repos={prsIgnoredRepos} onchange={(r) => (prsIgnoredRepos = r)} />
     <label class="checkbox">
       <input type="checkbox" bind:checked={includeReviewRequests} />
       Show PRs waiting on my review
@@ -84,8 +85,8 @@
   </fieldset>
 
   <fieldset>
-    <legend>Vulnerabilities</legend>
-    <RepoListEditor repos={vulnsIgnoredRepos} onchange={(r) => (vulnsIgnoredRepos = r)} />
+    <legend>Ignored repos</legend>
+    <RepoListEditor repos={ignored} onchange={(r) => (ignored = r)} />
   </fieldset>
 
   <fieldset>

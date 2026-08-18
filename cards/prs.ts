@@ -96,8 +96,8 @@ function map(resp: unknown, _prev: PrsData | undefined, _config?: Config): PrsDa
 
 function derive(data: PrsData, stored: PrsStored | undefined, now: number, config?: Config): { slice: Slice; stored: PrsStored } {
   const cfg = config?.modules.prs ?? CONFIG_DEFAULTS.modules.prs;
-  const inScope = (repo: string, updatedAt: number) =>
-    !cfg.ignoredRepos.includes(repo) && (cfg.staleDays <= 0 || now - updatedAt <= cfg.staleDays * DAY);
+  const inScope = (_repo: string, updatedAt: number) =>
+    cfg.staleDays <= 0 || now - updatedAt <= cfg.staleDays * DAY;
 
   const filteredAuthored = data.prs.filter((pr) => inScope(pr.repo, pr.updatedAt));
   const filteredReviews = data.reviews.filter((r) => inScope(r.repo, r.updatedAt));

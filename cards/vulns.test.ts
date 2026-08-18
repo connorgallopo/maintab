@@ -95,48 +95,6 @@ describe('derive', () => {
     ]);
   });
 
-  it('excludes ignored repos from rows and tile totals', () => {
-    const data = vulnsModule.graphql!.map(resp([
-      repo('widgetlib', [{ severity: 'CRITICAL', pkg: 'lodash' }]),
-      repo('ignored-repo', [{ severity: 'CRITICAL', pkg: 'other' }]),
-      repo('parsekit', [{ severity: 'HIGH', pkg: 'undici' }]),
-    ]), undefined);
-    const config = {
-      pat: 'test',
-      pollMinutes: 30,
-      themePin: 'system' as const,
-      modules: {
-        prs: { ignoredRepos: [], includeReviewRequests: true, rowCap: 8, staleDays: 0 },
-        vulns: { ignoredRepos: ['cgallopo/ignored-repo'] },
-        stars: { trackedRepos: [] },
-      },
-    };
-    const { slice } = vulnsModule.derive(data, undefined, NOW, config);
-    expect(slice.items).toHaveLength(2);
-    expect(slice.items.map((i) => i.repo)).toEqual(['widgetlib', 'parsekit']);
-    expect(slice.tile?.n).toBe(2);
-    expect(slice.tile?.note).toBe('1 critical');
-  });
-
-  it('headerLabel shows total after ignore', () => {
-    const data = vulnsModule.graphql!.map(resp([
-      repo('widgetlib', [{ severity: 'CRITICAL', pkg: 'lodash' }, { severity: 'HIGH', pkg: 'undici' }]),
-      repo('ignored-repo', [{ severity: 'CRITICAL', pkg: 'other' }]),
-    ]), undefined);
-    const config = {
-      pat: 'test',
-      pollMinutes: 30,
-      themePin: 'system' as const,
-      modules: {
-        prs: { ignoredRepos: [], includeReviewRequests: true, rowCap: 8, staleDays: 0 },
-        vulns: { ignoredRepos: ['cgallopo/ignored-repo'] },
-        stars: { trackedRepos: [] },
-      },
-    };
-    const { slice } = vulnsModule.derive(data, undefined, NOW, config);
-    expect(slice.headerLabel).toBe('Vulnerabilities (2) · C/H/M/L');
-  });
-
   it('links rows to the repo dependabot page', () => {
     const data = vulnsModule.graphql!.map(resp([repo('widgetlib', [{ severity: 'HIGH', pkg: 'undici' }])]), undefined);
     const { slice } = vulnsModule.derive(data, undefined, NOW);

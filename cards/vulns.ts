@@ -66,9 +66,8 @@ function map(resp: unknown, prev: VulnsData | undefined, _config?: Config): Vuln
   };
 }
 
-function derive(data: VulnsData, _stored: undefined, _now: number, config?: Config): { slice: Slice; stored: undefined } {
-  const ignoredRepos = config?.modules.vulns.ignoredRepos ?? [];
-  const filtered = data.repos.filter((r) => !ignoredRepos.includes(r.repo));
+function derive(data: VulnsData, _stored: undefined, _now: number, _config?: Config): { slice: Slice; stored: undefined } {
+  const filtered = data.repos;
 
   const rows = filtered
     .map((r) => {

@@ -112,15 +112,6 @@ describe('map', () => {
 });
 
 describe('derive filtering', () => {
-  it('drops authored and review rows in ignored repos by full owner/name match', () => {
-    const d = data(
-      [pr('a', { repo: 'cgallopo/widgetlib' }), pr('b', { repo: 'cgallopo/keep' })],
-      [rev('c', { repo: 'cgallopo/widgetlib' }), rev('d', { repo: 'cgallopo/keep' })],
-    );
-    const { slice } = prsModule.derive(d, undefined, NOW, config({ ignoredRepos: ['cgallopo/widgetlib'] }));
-    expect(slice.items.map((i) => i.id)).toEqual(['b', 'd']);
-  });
-
   it('drops entries older than staleDays', () => {
     const d = data([pr('fresh', { updatedAt: NOW - 1 * DAY }), pr('stale', { updatedAt: NOW - 10 * DAY })]);
     const { slice } = prsModule.derive(d, undefined, NOW, config({ staleDays: 5 }));
@@ -215,18 +206,6 @@ describe('seen markers', () => {
     const { stored: next } = prsModule.derive(data([pr('a', { commentTotal: 1 })]), stored, NOW);
     expect(next.seen.gone).toBeUndefined();
     expect(next.seen.a).toBeDefined();
-  });
-
-  it('are built only from kept authored PRs, so a filtered-out PR re-baselines without a badge flood on return', () => {
-    const stored = { seen: { a: { commentTotal: 2, seenAt: NOW } } };
-    const hidden = prsModule.derive(
-      data([pr('a', { repo: 'cgallopo/ignored', commentTotal: 9 })]),
-      stored, NOW, config({ ignoredRepos: ['cgallopo/ignored'] }),
-    );
-    expect(hidden.stored.seen.a).toBeUndefined();
-    const back = prsModule.derive(data([pr('a', { repo: 'cgallopo/ignored', commentTotal: 9 })]), hidden.stored, NOW);
-    expect(back.slice.items[0]!.badge).toBeUndefined();
-    expect(back.stored.seen.a!.commentTotal).toBe(9);
   });
 
   it('are never recorded for review rows', () => {
