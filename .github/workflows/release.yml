@@ -103,3 +103,12 @@ jobs:
           pnpm wxt submit \
             --firefox-zip ".output/maintab-${VERSION}-firefox.zip" \
             --firefox-sources-zip ".output/maintab-${VERSION}-sources.zip"
+
+      - name: Attach signed xpi
+        if: ${{ env.FIREFOX_JWT_ISSUER != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node scripts/fetch-signed-xpi.mjs "$VERSION" ".output/maintab-${VERSION}.xpi"
+          gh release upload "$GITHUB_REF_NAME" ".output/maintab-${VERSION}.xpi" --clobber
