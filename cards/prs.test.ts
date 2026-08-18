@@ -1,287 +1,195 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { fakeBrowser } from 'wxt/testing/fake-browser';
-import { prsModule, markSeen } from './prs';
-import type { PrView, RevView, PrsData, PrsStored } from './prs';
-import { modulesItem, CONFIG_DEFAULTS } from '../lib/storage';
-import type { Config } from '../lib/types';
+import { describe, it, expect } from 'vitest';
+import { prsModule } from './prs';
+import type { MyPr, PrsData } from './prs';
+import { CONFIG_DEFAULTS } from '../lib/storage';
+import type { Config, RepoNode } from '../lib/types';
+import type { PrNode } from '../lib/pr';
 
 const NOW = 1_800_000_000_000;
 const DAY = 86_400_000;
 
 function config(overrides: Partial<Config['modules']['prs']> = {}): Config {
   return {
-    modules: {
-      ...CONFIG_DEFAULTS.modules,
-      prs: { ...CONFIG_DEFAULTS.modules.prs, ...overrides },
-    },
+    repos: CONFIG_DEFAULTS.repos,
+    modules: { ...CONFIG_DEFAULTS.modules, prs: { ...CONFIG_DEFAULTS.modules.prs, ...overrides } },
   } as Config;
 }
 
-const node = (id: string, overrides: Partial<{
-  number: number; title: string; url: string; updatedAt: string;
-  repository: { nameWithOwner: string };
-  comments: { totalCount: number };
-  reviews: { totalCount: number };
-}> = {}) => ({
-  id,
-  number: 241,
-  title: 'Fix retry queue race',
-  url: `https://github.com/cgallopo/widgetlib/pull/${id}`,
-  updatedAt: '2024-01-01T00:00:00Z',
+const node = (id: string, o: Partial<PrNode & { repository: { nameWithOwner: string } }> = {}) => ({
+  id, number: 241, title: 'Fix retry queue race', url: `https://github.com/cgallopo/widgetlib/pull/${id}`,
+  createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+  isDraft: false, reviewDecision: null, author: { login: 'me' },
+  comments: { totalCount: 2 }, reviews: { totalCount: 1 },
+  commits: { nodes: [] },
   repository: { nameWithOwner: 'cgallopo/widgetlib' },
-  comments: { totalCount: 2 },
-  reviews: { totalCount: 1 },
-  ...overrides,
+  ...o,
 });
 
-const resp = (auth: unknown[], authTotal?: number, rev?: unknown[], revTotal?: number) => ({
-  prsAuth: { issueCount: authTotal ?? auth.length, nodes: auth },
-  ...(rev ? { prsRev: { issueCount: revTotal ?? rev.length, nodes: rev } } : {}),
+const resp = (inv: unknown[], rev?: unknown[]) => ({
+  prsInv: { issueCount: inv.length, nodes: inv },
+  ...(rev ? { prsRev: { issueCount: rev.length, nodes: rev } } : {}),
 });
 
-const pr = (id: string, overrides: Partial<PrView> = {}): PrView => ({
-  id,
-  repo: 'cgallopo/widgetlib',
-  number: 241,
-  title: 'Fix retry queue race',
+const pr = (id: string, o: Partial<MyPr> = {}): MyPr => ({
+  id, repo: 'cgallopo/widgetlib', number: 241, title: 'Fix retry queue race',
   url: `https://github.com/cgallopo/widgetlib/pull/${id}`,
-  updatedAt: NOW,
-  commentTotal: 0,
-  ...overrides,
+  createdAt: NOW - DAY, updatedAt: NOW, total: 0, author: 'me',
+  isDraft: false, reviewDecision: null, ci: null, reviewRequested: false,
+  ...o,
 });
 
-const rev = (id: string, overrides: Partial<RevView> = {}): RevView => ({
-  id,
-  repo: 'cgallopo/widgetlib',
-  number: 99,
-  title: 'Please take a look',
-  url: `https://github.com/cgallopo/widgetlib/pull/${id}`,
-  updatedAt: NOW,
-  ...overrides,
-});
-
-const data = (prs: PrView[] = [], reviews: RevView[] = [], authTotal?: number, revTotal?: number): PrsData => ({
-  prs, reviews, authTotal: authTotal ?? prs.length, revTotal: revTotal ?? reviews.length,
-});
+const data = (prs: MyPr[], o: Partial<PrsData> = {}): PrsData => ({ prs, login: 'me', maintained: [], ...o });
 
 describe('fragment', () => {
-  it('emits the authored-PR search with issueCount and PR fields', () => {
-    const f = prsModule.graphql!.fragment(config({ includeReviewRequests: false }), null);
-    expect(f).toContain('prsAuth: search(type: ISSUE, first: 50, query: "is:pr is:open author:@me sort:updated-desc")');
-    expect(f).toContain('issueCount');
-    expect(f).toContain('... on PullRequest');
-  });
-
-  it('adds the review-requested search only when includeReviewRequests is set', () => {
+  it('searches PRs involving me, and review requests only when enabled', () => {
     const off = prsModule.graphql!.fragment(config({ includeReviewRequests: false }), null);
+    expect(off).toContain('prsInv: search(type: ISSUE, first: 50, query: "is:pr is:open involves:@me sort:updated-desc")');
+    expect(off).toContain('issueCount');
+    expect(off).toContain('... on PullRequest');
+    expect(off).toContain('repository { nameWithOwner }');
     expect(off).not.toContain('prsRev');
 
     const on = prsModule.graphql!.fragment(config({ includeReviewRequests: true }), null);
-    expect(on).toContain(
-      'prsRev: search(type: ISSUE, first: 25, query: "is:pr is:open review-requested:@me -reviewed-by:@me sort:updated-desc")',
-    );
-    expect(on).toContain('issueCount');
+    expect(on).toContain('prsRev: search(type: ISSUE, first: 25, query: "is:pr is:open review-requested:@me -reviewed-by:@me sort:updated-desc")');
   });
 });
 
 describe('map', () => {
-  it('reads both aliases into prs and reviews', () => {
-    const d = prsModule.graphql!.map(resp([node('a')], 1, [node('b')], 1), undefined);
+  it('unions both searches by id and flags review requests', () => {
+    const d = prsModule.graphql!.map(resp([node('a'), node('b')], [node('b'), node('c', { author: { login: 'them' } })]), undefined);
+    expect(d.prs.map((p) => p.id)).toEqual(['a', 'b', 'c']);
+    expect(d.prs.map((p) => p.reviewRequested)).toEqual([false, true, true]);
+    expect(d.prs[2]!.author).toBe('them');
+    expect(d.prs[0]!.repo).toBe('cgallopo/widgetlib');
+    expect(d.prs[0]!.total).toBe(3);
+  });
+
+  it('starts with an empty login and maintained list', () => {
+    const d = prsModule.graphql!.map(resp([]), undefined);
+    expect(d).toEqual({ prs: [], login: '', maintained: [] });
+  });
+});
+
+describe('mapRepos', () => {
+  it('stamps the login and the maintained repo names', () => {
+    const repos = [{ nameWithOwner: 'me/x' }, { nameWithOwner: 'org/y' }] as RepoNode[];
+    const d = prsModule.mapRepos!(repos, data([pr('a')], { login: '' }), { config: config(), login: 'me' });
+    expect(d.login).toBe('me');
+    expect(d.maintained).toEqual(['me/x', 'org/y']);
     expect(d.prs).toHaveLength(1);
-    expect(d.reviews).toHaveLength(1);
-    expect(d.authTotal).toBe(1);
-    expect(d.revTotal).toBe(1);
-  });
-
-  it('defaults reviews and revTotal when prsRev is absent', () => {
-    const d = prsModule.graphql!.map(resp([node('a')], 1), undefined);
-    expect(d.reviews).toEqual([]);
-    expect(d.revTotal).toBe(0);
-  });
-
-  it('parses updatedAt to epoch ms', () => {
-    const d = prsModule.graphql!.map(resp([node('a', { updatedAt: '2024-01-01T00:00:00Z' })], 1), undefined);
-    expect(d.prs[0]!.updatedAt).toBe(Date.parse('2024-01-01T00:00:00Z'));
-  });
-
-  it('sums comments and reviews into commentTotal', () => {
-    const n = node('a', { comments: { totalCount: 3 }, reviews: { totalCount: 2 } });
-    const d = prsModule.graphql!.map(resp([n], 1), undefined);
-    expect(d.prs[0]!.commentTotal).toBe(5);
   });
 });
 
 describe('derive filtering', () => {
-  it('drops entries older than staleDays', () => {
-    const d = data([pr('fresh', { updatedAt: NOW - 1 * DAY }), pr('stale', { updatedAt: NOW - 10 * DAY })]);
-    const { slice } = prsModule.derive(d, undefined, NOW, config({ staleDays: 5 }));
-    expect(slice.items.map((i) => i.id)).toEqual(['fresh']);
+  it('keeps authored PRs and review requests anywhere, and involved PRs only outside maintained repos', () => {
+    const d = data([
+      pr('mine', { repo: 'me/x' }),
+      pr('rev', { repo: 'me/x', author: 'them', reviewRequested: true }),
+      pr('inv-maint', { repo: 'me/x', author: 'them' }),
+      pr('inv-else', { repo: 'other/z', author: 'them' }),
+    ], { maintained: ['me/x'] });
+    const { slice } = prsModule.derive(d, undefined, NOW, config());
+    expect(slice.items.map((i) => i.id).sort()).toEqual(['inv-else', 'mine', 'rev']);
   });
 
-  it('keeps an entry exactly at the staleDays boundary', () => {
-    const d = data([pr('edge', { updatedAt: NOW - 5 * DAY })]);
+  it('drops entries older than staleDays and keeps the boundary', () => {
+    const d = data([pr('fresh', { updatedAt: NOW - DAY }), pr('edge', { updatedAt: NOW - 5 * DAY }), pr('stale', { updatedAt: NOW - 10 * DAY })]);
     const { slice } = prsModule.derive(d, undefined, NOW, config({ staleDays: 5 }));
-    expect(slice.items.map((i) => i.id)).toEqual(['edge']);
+    expect(slice.items.map((i) => i.id)).toEqual(['fresh', 'edge']);
   });
 
   it('does not filter by staleness when staleDays is 0', () => {
-    const d = data([pr('old', { updatedAt: NOW - 400 * DAY })]);
-    const { slice } = prsModule.derive(d, undefined, NOW, config({ staleDays: 0 }));
+    const { slice } = prsModule.derive(data([pr('old', { updatedAt: NOW - 400 * DAY })]), undefined, NOW, config({ staleDays: 0 }));
     expect(slice.items.map((i) => i.id)).toEqual(['old']);
   });
-});
 
-describe('review rows', () => {
-  it('excludes a review row already present as authored, so it appears once as authored', () => {
-    const d = data([pr('shared')], [rev('shared'), rev('other')]);
-    const { slice } = prsModule.derive(d, undefined, NOW);
-    expect(slice.items.map((i) => i.id)).toEqual(['shared', 'other']);
-    expect(slice.items[0]!.pill).toBeUndefined();
-  });
-
-  it('carry a review tag and never an unread pill', () => {
-    const d = data([], [rev('r1')]);
-    const { slice } = prsModule.derive(d, undefined, NOW);
-    expect(slice.items[0]!.tag).toEqual({ text: 'review', tone: 'accent' });
+  it('sorts by updatedAt descending', () => {
+    const d = data([pr('older', { updatedAt: NOW - 3 * DAY }), pr('newer', { updatedAt: NOW - DAY })]);
+    const { slice } = prsModule.derive(d, undefined, NOW, config());
+    expect(slice.items.map((i) => i.id)).toEqual(['newer', 'older']);
   });
 });
 
-describe('rows and header label', () => {
-  it('orders authored PRs before reviews', () => {
-    const d = data([pr('a')], [rev('r')]);
-    const { slice } = prsModule.derive(d, undefined, NOW);
-    expect(slice.items.map((i) => i.id)).toEqual(['a', 'r']);
+describe('rows', () => {
+  it('shows repo #number, title, a mark, and a status tag', () => {
+    const d = data([pr('a', { reviewDecision: 'APPROVED', total: 4 })]);
+    const { slice } = prsModule.derive(d, undefined, NOW, config());
+    expect(slice.items[0]).toMatchObject({
+      repo: 'widgetlib #241', primary: 'Fix retry queue race', href: 'https://github.com/cgallopo/widgetlib/pull/a',
+      tag: { text: 'approved', tone: 'good' }, mark: { total: 4 },
+    });
   });
 
-  it('slices combined rows to rowCap and reports showing S of T', () => {
+  it('tags review requests "review" and non-authored rows "involved"', () => {
+    const d = data([pr('r', { author: 'them', reviewRequested: true }), pr('i', { repo: 'other/z', author: 'them' })]);
+    const { slice } = prsModule.derive(d, undefined, NOW, config());
+    expect(slice.items.find((i) => i.id === 'r')!.tag).toEqual({ text: 'review', tone: 'accent' });
+    expect(slice.items.find((i) => i.id === 'i')!.tag).toEqual({ text: 'involved', tone: 'dim' });
+  });
+
+  it('caps rows and reports showing S of T; header shows the plain count otherwise', () => {
     const d = data([pr('a'), pr('b'), pr('c')]);
-    const { slice } = prsModule.derive(d, undefined, NOW, config({ rowCap: 2 }));
-    expect(slice.items).toHaveLength(2);
-    expect(slice.headerLabel).toBe('Open PRs (showing 2 of 3)');
-  });
-
-  it('shows at least one row even when rowCap is 0', () => {
-    const d = data([pr('a'), pr('b')]);
-    const { slice } = prsModule.derive(d, undefined, NOW, config({ rowCap: 0 }));
-    expect(slice.items).toHaveLength(1);
-  });
-
-  it('labels the header with just the authored count when there are no reviews', () => {
-    const d = data([pr('a'), pr('b')]);
-    const { slice } = prsModule.derive(d, undefined, NOW);
-    expect(slice.headerLabel).toBe('Open PRs (2)');
-  });
-
-  it('labels the header with authored and review counts when both are shown in full', () => {
-    const d = data([pr('a')], [rev('r')]);
-    const { slice } = prsModule.derive(d, undefined, NOW, config({ rowCap: 8 }));
-    expect(slice.headerLabel).toBe('Open PRs (1 + 1 reviews)');
+    expect(prsModule.derive(d, undefined, NOW, config({ rowCap: 2 })).slice.headerLabel).toBe('My PRs (showing 2 of 3)');
+    expect(prsModule.derive(d, undefined, NOW, config()).slice.headerLabel).toBe('My PRs (3)');
+    expect(prsModule.derive(d, undefined, NOW, config({ rowCap: 0 })).slice.items).toHaveLength(1);
   });
 });
 
 describe('seen markers', () => {
-  it('first sight of a PR shows no unread and records a marker', () => {
-    const { slice, stored } = prsModule.derive(data([pr('a', { commentTotal: 4 })]), undefined, NOW);
-    expect(slice.items[0]!.pill).toBeUndefined();
-    expect(stored.seen.a!.commentTotal).toBe(4);
-  });
-
-  it('new comments since marker show as unread', () => {
-    const stored = { seen: { a: { commentTotal: 4, seenAt: NOW } } };
-    const { slice } = prsModule.derive(data([pr('a', { commentTotal: 7 })]), stored, NOW);
-    expect(slice.items[0]!.pill).toEqual({ text: '3 new' });
-  });
-
-  it('clamps the marker down when comments were deleted', () => {
-    const stored = { seen: { a: { commentTotal: 10, seenAt: NOW } } };
-    const first = prsModule.derive(data([pr('a', { commentTotal: 9 })]), stored, NOW);
+  it('first sight of an authored PR is silent; a later comment shows N new', () => {
+    const first = prsModule.derive(data([pr('a', { total: 4 })]), undefined, NOW, config());
     expect(first.slice.items[0]!.pill).toBeUndefined();
-    expect(first.stored.seen.a!.commentTotal).toBe(9);
-    const second = prsModule.derive(data([pr('a', { commentTotal: 10 })]), first.stored, NOW);
-    expect(second.slice.items[0]!.pill?.text).toBe('1 new');
+    expect(first.stored.seen.a).toEqual({ total: 4, seenAt: NOW });
+    const second = prsModule.derive(data([pr('a', { total: 7 })]), first.stored, NOW + 1, config());
+    expect(second.slice.items[0]!.pill).toEqual({ text: '3 new' });
   });
 
-  it('prunes markers for PRs no longer open', () => {
-    const stored = { seen: { gone: { commentTotal: 2, seenAt: NOW }, a: { commentTotal: 1, seenAt: NOW } } };
-    const { stored: next } = prsModule.derive(data([pr('a', { commentTotal: 1 })]), stored, NOW);
+  it('a non-authored PR that appears after the baseline shows "new"; an authored one does not', () => {
+    const stored = { baselineAt: NOW - 10 * DAY, seen: {} };
+    const d = data([pr('inv', { repo: 'o/z', author: 'them', createdAt: NOW - DAY }), pr('mine', { createdAt: NOW - DAY })]);
+    const { slice } = prsModule.derive(d, stored, NOW, config());
+    expect(slice.items.find((i) => i.id === 'inv')!.pill).toEqual({ text: 'new' });
+    expect(slice.items.find((i) => i.id === 'mine')!.pill).toBeUndefined();
+  });
+
+  it('prunes markers for PRs no longer listed', () => {
+    const stored = { baselineAt: NOW, seen: { gone: { total: 2, seenAt: NOW }, a: { total: 1, seenAt: NOW } } };
+    const { stored: next } = prsModule.derive(data([pr('a', { total: 1 })]), stored, NOW, config());
     expect(next.seen.gone).toBeUndefined();
     expect(next.seen.a).toBeDefined();
-  });
-
-  it('are never recorded for review rows', () => {
-    const { stored } = prsModule.derive(data([], [rev('r')]), undefined, NOW);
-    expect(stored.seen.r).toBeUndefined();
   });
 });
 
 describe('tile', () => {
-  it('counts against authTotal, not the filtered or paged rows length', () => {
-    const { slice } = prsModule.derive(data([pr('a')], [], 140), undefined, NOW);
-    expect(slice.tile).toMatchObject({ n: 140, label: 'Open PRs' });
+  it('counts rows before the cap and prefers the review-request note', () => {
+    const d = data([pr('a'), pr('b', { author: 'them', reviewRequested: true }), pr('c')]);
+    const { slice } = prsModule.derive(d, undefined, NOW, config({ rowCap: 2 }));
+    expect(slice.tile).toEqual({ n: 3, label: 'My PRs', note: '1 awaiting my review', noteTone: 'accent' });
   });
 
-  it('notes the unread comment count in good tone when present', () => {
-    const stored = { seen: { a: { commentTotal: 1, seenAt: NOW } } };
-    const d = data([pr('a', { commentTotal: 5 })], [rev('r')], 1);
-    const { slice } = prsModule.derive(d, stored, NOW);
-    expect(slice.tile).toMatchObject({ note: '1 with new comments', noteTone: 'good' });
-  });
-
-  it('falls back to review request count in dim tone when nothing is unread', () => {
-    const d = data([pr('a')], [rev('r1'), rev('r2')], 1);
-    const { slice } = prsModule.derive(d, undefined, NOW);
-    expect(slice.tile).toMatchObject({ note: '2 review requests', noteTone: 'dim' });
-  });
-
-  it('has no note when nothing is unread and there are no review requests', () => {
-    const { slice } = prsModule.derive(data([pr('a')]), undefined, NOW);
-    expect(slice.tile?.note).toBeUndefined();
+  it('falls back to the new-activity note, then no note', () => {
+    const stored = { baselineAt: NOW, seen: { a: { total: 1, seenAt: NOW } } };
+    const withNew = prsModule.derive(data([pr('a', { total: 5 })]), stored, NOW, config());
+    expect(withNew.slice.tile).toMatchObject({ note: '1 with new activity', noteTone: 'good' });
+    const quiet = prsModule.derive(data([pr('a')]), undefined, NOW, config());
+    expect(quiet.slice.tile).toEqual({ n: 1, label: 'My PRs', note: undefined, noteTone: undefined });
   });
 });
 
 describe('empty state', () => {
-  it('is empty with no PRs and no reviews', () => {
-    const { slice } = prsModule.derive(data(), undefined, NOW);
+  it('is empty with no PRs', () => {
+    const { slice } = prsModule.derive(data([]), undefined, NOW, config());
     expect(slice.status).toBe('empty');
     expect(slice.emptyText).toBe('No open PRs');
+    expect(slice.headerHref).toBe('https://github.com/pulls');
   });
 });
 
-describe('config defaults', () => {
-  it('derive with config omitted uses CONFIG_DEFAULTS.modules.prs', () => {
-    const cap = CONFIG_DEFAULTS.modules.prs.rowCap;
-    const prs = Array.from({ length: cap + 2 }, (_, i) => pr(`p${i}`));
-    const { slice } = prsModule.derive(data(prs), undefined, NOW);
-    expect(slice.items).toHaveLength(cap);
-  });
-});
-
-describe('markSeen', () => {
-  beforeEach(() => fakeBrowser.reset());
-
-  it('resets the marker to the rendered total', async () => {
-    const { slice, stored } = prsModule.derive(
-      data([pr('a', { commentTotal: 6 })]),
-      { seen: { a: { commentTotal: 2, seenAt: NOW } } },
-      NOW,
-    );
-    await modulesItem.setValue({ prs: { v: 1, slice, data: stored } });
-    await markSeen('a');
-    const state = await modulesItem.getValue();
-    const d = state.prs!.data as { seen: Record<string, { commentTotal: number }> };
-    expect(d.seen.a!.commentTotal).toBe(6);
-    expect(state.prs!.slice.items[0]!.pill).toBeUndefined();
-  });
-
-  it('leaves a review-tagged row untouched, without writing a marker', async () => {
-    const { slice } = prsModule.derive(data([], [rev('r')]), undefined, NOW);
-    const stored: PrsStored = { seen: { a: { commentTotal: 1, seenAt: NOW } } };
-    await modulesItem.setValue({ prs: { v: 1, slice, data: stored } });
-    await markSeen('r');
-    const state = await modulesItem.getValue();
-    const d = state.prs!.data as PrsStored;
-    expect(d.seen.r).toBeUndefined();
-    expect(d.seen.a).toEqual({ commentTotal: 1, seenAt: NOW });
-    expect(state.prs!.slice.items[0]!.tag).toEqual({ text: 'review', tone: 'accent' });
+describe('module', () => {
+  it('is version 2 and migrates v1 seen markers to the shared shape', () => {
+    expect(prsModule.version).toBe(2);
+    const migrated = prsModule.migrate!({ seen: { a: { commentTotal: 3, seenAt: 5 } } }, 1);
+    expect(migrated.seen).toEqual({ a: { total: 3, seenAt: 5 } });
+    expect(migrated.baselineAt).toBeGreaterThan(0);
   });
 });

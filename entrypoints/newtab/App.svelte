@@ -4,7 +4,7 @@
   import { browser } from '#imports';
   import type { Config, ModulesState, SyncState, Tile } from '../../lib/types';
   import { configItem, syncItem, modulesItem } from '../../lib/storage';
-  import { markSeen } from '../../cards/prs';
+  import { markSeen } from '../../lib/seen';
   import { markRead } from '../../cards/notifications';
   import Masthead from '../../components/kit/Masthead.svelte';
   import StatTile from '../../components/kit/StatTile.svelte';
@@ -82,13 +82,13 @@
 
     {#if modules.prs}
       <div class="primary">
-        <Card slice={modules.prs.slice} onheader={headerClick} onrow={(id) => void markSeen(id)} />
+        <Card slice={modules.prs.slice} onheader={headerClick} onrow={(id) => void markSeen('prs', id)} />
       </div>
     {/if}
 
     <div class="secondary">
       {#if modules.notifications}<Card slice={modules.notifications.slice} onheader={headerClick} onrowact={(id) => void markRead(id)} />{/if}
-      {#if modules.vulns}<Card slice={modules.vulns.slice} onheader={headerClick} />{/if}
+      {#if modules.vulns}<Card slice={modules.vulns.slice} onheader={headerClick} onrow={(id) => void markSeen('vulns', id)} />{/if}
       {#if modules.stars}<Card slice={modules.stars.slice} onheader={headerClick} />{/if}
     </div>
   {/if}

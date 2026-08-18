@@ -1,186 +1,128 @@
-import type { Config, ModuleDef, RowItem, Slice } from '../lib/types';
-import { modulesItem, CONFIG_DEFAULTS } from '../lib/storage';
+import type { Config, ModuleDef, RepoCtx, RepoNode, RowItem, Slice } from '../lib/types';
+import { CONFIG_DEFAULTS } from '../lib/storage';
+import { applySeen, pillFor, type SeenStore } from '../lib/seen';
+import { PR_NODE_FIELDS, mapPrNode, prStatusTag, type PrBase, type PrNode } from '../lib/pr';
 
 const DAY = 86_400_000;
 
-export interface PrView {
-  id: string;
+export interface MyPr extends PrBase {
   repo: string;
-  number: number;
-  title: string;
-  url: string;
-  updatedAt: number;
-  commentTotal: number;
-}
-
-export interface RevView {
-  id: string;
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  updatedAt: number;
+  reviewRequested: boolean;
 }
 
 export interface PrsData {
-  prs: PrView[];
-  reviews: RevView[];
-  authTotal: number;
-  revTotal: number;
+  prs: MyPr[];
+  login: string;
+  maintained: string[];
 }
 
-export interface PrsStored {
-  seen: Record<string, { commentTotal: number; seenAt: number }>;
-}
+export type PrsStored = SeenStore;
 
-const PR_SEARCH = 'https://github.com/pulls?q=is%3Aopen+is%3Apr+author%3A%40me';
+type SearchNode = PrNode & { repository: { nameWithOwner: string } };
 
-const PR_FIELDS = `... on PullRequest {
-  id number title url updatedAt
-  repository { nameWithOwner }
-  comments { totalCount }
-  reviews { totalCount }
-}`;
+const NODE = `... on PullRequest { ${PR_NODE_FIELDS} repository { nameWithOwner } }`;
 
 function fragment(config: Config, _cursor: string | null): string {
-  const auth = `prsAuth: search(type: ISSUE, first: 50, query: "is:pr is:open author:@me sort:updated-desc") {
-    issueCount
-    nodes { ${PR_FIELDS} }
-  }`;
-  if (!config.modules.prs.includeReviewRequests) return auth;
-  return `${auth}
+  const inv = `prsInv: search(type: ISSUE, first: 50, query: "is:pr is:open involves:@me sort:updated-desc") {
+  issueCount
+  nodes { ${NODE} }
+}`;
+  if (!config.modules.prs.includeReviewRequests) return inv;
+  return `${inv}
 prsRev: search(type: ISSUE, first: 25, query: "is:pr is:open review-requested:@me -reviewed-by:@me sort:updated-desc") {
   issueCount
-  nodes { ${PR_FIELDS} }
+  nodes { ${NODE} }
 }`;
 }
 
-interface PrNode {
-  id: string; number: number; title: string; url: string; updatedAt: string;
-  repository: { nameWithOwner: string };
-  comments: { totalCount: number };
-  reviews: { totalCount: number };
-}
-
-interface PrsResp {
-  prsAuth: { issueCount: number; nodes: PrNode[] };
-  prsRev?: { issueCount: number; nodes: PrNode[] };
+interface SearchResp {
+  prsInv: { issueCount: number; nodes: SearchNode[] };
+  prsRev?: { issueCount: number; nodes: SearchNode[] };
 }
 
 function map(resp: unknown, _prev: PrsData | undefined, _config?: Config): PrsData {
-  const r = resp as PrsResp;
-  const prs: PrView[] = r.prsAuth.nodes.map((n) => ({
-    id: n.id,
-    repo: n.repository.nameWithOwner,
-    number: n.number,
-    title: n.title,
-    url: n.url,
-    updatedAt: Date.parse(n.updatedAt),
-    commentTotal: n.comments.totalCount + n.reviews.totalCount,
-  }));
-  const reviews: RevView[] = (r.prsRev?.nodes ?? []).map((n) => ({
-    id: n.id,
-    repo: n.repository.nameWithOwner,
-    number: n.number,
-    title: n.title,
-    url: n.url,
-    updatedAt: Date.parse(n.updatedAt),
-  }));
-  return {
-    prs,
-    reviews,
-    authTotal: r.prsAuth.issueCount,
-    revTotal: r.prsRev?.issueCount ?? 0,
-  };
+  const r = resp as SearchResp;
+  const revNodes = r.prsRev?.nodes ?? [];
+  const revIds = new Set(revNodes.map((n) => n.id));
+  const byId = new Map<string, MyPr>();
+  for (const n of [...r.prsInv.nodes, ...revNodes]) {
+    if (byId.has(n.id)) continue;
+    byId.set(n.id, { ...mapPrNode(n), repo: n.repository.nameWithOwner, reviewRequested: revIds.has(n.id) });
+  }
+  return { prs: [...byId.values()], login: '', maintained: [] };
+}
+
+function mapRepos(repos: RepoNode[], prev: PrsData | undefined, ctx: RepoCtx): PrsData {
+  return { prs: prev?.prs ?? [], login: ctx.login, maintained: repos.map((r) => r.nameWithOwner) };
 }
 
 function derive(data: PrsData, stored: PrsStored | undefined, now: number, config?: Config): { slice: Slice; stored: PrsStored } {
   const cfg = config?.modules.prs ?? CONFIG_DEFAULTS.modules.prs;
-  const inScope = (_repo: string, updatedAt: number) =>
-    cfg.staleDays <= 0 || now - updatedAt <= cfg.staleDays * DAY;
+  const maintained = new Set(data.maintained);
 
-  const filteredAuthored = data.prs.filter((pr) => inScope(pr.repo, pr.updatedAt));
-  const filteredReviews = data.reviews.filter((r) => inScope(r.repo, r.updatedAt));
-  const authoredIds = new Set(filteredAuthored.map((pr) => pr.id));
-  const dedupedReviews = filteredReviews.filter((r) => !authoredIds.has(r.id));
+  const kept = data.prs
+    .map((pr) => ({ pr, authored: data.login !== '' && pr.author === data.login }))
+    .filter(({ pr, authored }) => authored || pr.reviewRequested || !maintained.has(pr.repo))
+    .filter(({ pr }) => cfg.staleDays <= 0 || now - pr.updatedAt <= cfg.staleDays * DAY)
+    .sort((a, b) => b.pr.updatedAt - a.pr.updatedAt);
 
-  const seen: PrsStored['seen'] = {};
-  let touched = 0;
-  const authoredItems: RowItem[] = filteredAuthored.map((pr) => {
-    const marker = stored?.seen[pr.id]?.commentTotal ?? pr.commentTotal;
-    const clamped = Math.min(marker, pr.commentTotal);
-    seen[pr.id] = { commentTotal: clamped, seenAt: stored?.seen[pr.id]?.seenAt ?? now };
-    const unread = pr.commentTotal - clamped;
-    if (unread > 0) touched += 1;
-    return {
-      id: pr.id,
-      href: pr.url,
-      repo: `${pr.repo.split('/')[1]} #${pr.number}`,
-      primary: pr.title,
-      pill: unread > 0 ? { text: `${unread} new` } : undefined,
-    };
-  });
+  const { marks, next } = applySeen(
+    stored,
+    kept.map(({ pr, authored }) => ({ id: pr.id, total: pr.total, createdAt: pr.createdAt, flagNew: !authored })),
+    now,
+  );
 
-  const reviewItems: RowItem[] = dedupedReviews.map((r) => ({
-    id: r.id,
-    href: r.url,
-    repo: `${r.repo.split('/')[1]} #${r.number}`,
-    primary: r.title,
-    tag: { text: 'review', tone: 'accent' as const },
+  const items: RowItem[] = kept.map(({ pr, authored }) => ({
+    id: pr.id,
+    href: pr.url,
+    repo: `${pr.repo.split('/')[1] ?? pr.repo} #${pr.number}`,
+    primary: pr.title,
+    tag: prStatusTag(pr, { reviewRequested: pr.reviewRequested, authored }),
+    pill: pillFor(marks[pr.id]),
+    mark: { total: pr.total },
   }));
 
-  const combined = [...authoredItems, ...reviewItems];
   const cap = Math.max(1, cfg.rowCap);
-  const items = combined.slice(0, cap);
-  const truncated = items.length < combined.length;
-
-  const headerLabel = truncated
-    ? `Open PRs (showing ${items.length} of ${combined.length})`
-    : dedupedReviews.length
-      ? `Open PRs (${filteredAuthored.length} + ${dedupedReviews.length} reviews)`
-      : `Open PRs (${filteredAuthored.length})`;
+  const rows = items.slice(0, cap);
+  const reviewReq = kept.filter(({ pr }) => pr.reviewRequested).length;
+  const active = items.filter((i) => i.pill).length;
+  const headerLabel = rows.length < items.length
+    ? `My PRs (showing ${rows.length} of ${items.length})`
+    : `My PRs (${items.length})`;
 
   return {
     slice: {
-      status: items.length ? 'ok' : 'empty',
+      status: rows.length ? 'ok' : 'empty',
       emptyText: 'No open PRs',
-      headerHref: PR_SEARCH,
+      headerHref: 'https://github.com/pulls',
       headerLabel,
-      items,
+      items: rows,
       tile: {
-        n: data.authTotal,
-        label: 'Open PRs',
-        note: touched
-          ? `${touched} with new comments`
-          : dedupedReviews.length
-            ? `${dedupedReviews.length} review requests`
-            : undefined,
-        noteTone: touched ? 'good' : dedupedReviews.length ? 'dim' : undefined,
+        n: items.length,
+        label: 'My PRs',
+        note: reviewReq ? `${reviewReq} awaiting my review` : active ? `${active} with new activity` : undefined,
+        noteTone: reviewReq ? 'accent' : active ? 'good' : undefined,
       },
     },
-    stored: { seen },
+    stored: next,
   };
+}
+
+interface LegacyStored {
+  seen?: Record<string, { commentTotal: number; seenAt: number }>;
 }
 
 export const prsModule: ModuleDef<PrsData, PrsStored> = {
   id: 'prs',
-  title: 'Open PRs',
-  version: 1,
+  title: 'My PRs',
+  version: 2,
+  migrate: (old) => {
+    const legacy = (old as LegacyStored | undefined)?.seen ?? {};
+    const seen: SeenStore['seen'] = {};
+    for (const [id, s] of Object.entries(legacy)) seen[id] = { total: s.commentTotal, seenAt: s.seenAt };
+    return { baselineAt: Date.now(), seen };
+  },
   graphql: { fragment, map },
+  mapRepos,
   derive,
 };
-
-export async function markSeen(prId: string): Promise<void> {
-  const state = await modulesItem.getValue();
-  const entry = state.prs;
-  if (!entry) return;
-  const data = entry.data as PrsStored;
-  const item = entry.slice.items.find((i) => i.id === prId);
-  if (!item) return;
-  if (item.tag && !item.pill) return;
-  const current = data.seen[prId];
-  const unread = item.pill ? Number.parseInt(item.pill.text, 10) : 0;
-  data.seen[prId] = { commentTotal: (current?.commentTotal ?? 0) + unread, seenAt: Date.now() };
-  item.pill = undefined;
-  await modulesItem.setValue({ ...state, prs: { ...entry, data, slice: { ...entry.slice } } });
-}

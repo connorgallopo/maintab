@@ -9,7 +9,6 @@ const NOW = 1_800_000_000_000;
 
 const ROOT = {
   viewer: { login: 'me' },
-  prsAuth: { issueCount: 0, nodes: [] },
   prsInv: { issueCount: 0, nodes: [] },
   prsRev: { issueCount: 0, nodes: [] },
 };
