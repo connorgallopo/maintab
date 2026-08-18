@@ -203,6 +203,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  publish-browser-extension@6.0.0: 1abd06dfeb5e88af1cf78bbf2086da803e6f96ce91ef3cfbfefe7ef4d1675627
+
 importers:
 
   .:
@@ -1951,7 +1954,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  publish-browser-extension@6.0.0:
+  publish-browser-extension@6.0.0(patch_hash=1abd06dfeb5e88af1cf78bbf2086da803e6f96ce91ef3cfbfefe7ef4d1675627):
     dependencies:
       '@topcli/prompts': 4.0.0
       cac: 7.0.0
@@ -2205,7 +2208,7 @@ snapshots:
       nypm: 0.6.9
       ohash: 2.0.11
       picomatch: 4.0.5
-      publish-browser-extension: 6.0.0
+      publish-browser-extension: 6.0.0(patch_hash=1abd06dfeb5e88af1cf78bbf2086da803e6f96ce91ef3cfbfefe7ef4d1675627)
       scule: 1.3.0
       superlock: 1.3.5
       tiny-open: 1.3.0

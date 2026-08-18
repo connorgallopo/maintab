@@ -1,0 +1,23 @@
+diff --git a/dist/init-B7xLzFhA.mjs b/dist/init-B7xLzFhA.mjs
+index 0e3f0145de9bb0f836366557a60714b1cd60186e..04d76a00645f855a7ed1dc9a62e99059e37c3f82 100644
+--- a/dist/init-B7xLzFhA.mjs
++++ b/dist/init-B7xLzFhA.mjs
+@@ -1604,7 +1604,7 @@ var FirefoxAddonStoreV5 = class {
+ 		this.setStatus("Uploading new ZIP file");
+ 		const uploadBody = new FormData();
+ 		uploadBody.set("channel", this.options.channel);
+-		uploadBody.set("upload", await openAsBlob(this.options.zip));
++		uploadBody.set("upload", await openAsBlob(this.options.zip), path.basename(this.options.zip));
+ 		const { uuid: uploadUuid } = await this.client.post("/api/v5/addons/upload/", { body: uploadBody });
+ 		this.setStatus("Waiting for validation results");
+ 		const upload = await pollUntil(async () => {
+@@ -1620,7 +1620,8 @@ var FirefoxAddonStoreV5 = class {
+ 		this.setStatus("Submitting new version");
+ 		const versionBody = new FormData();
+ 		versionBody.set("upload", upload.uuid);
+-		versionBody.set("source", this.options.sourcesZip ? await openAsBlob(this.options.sourcesZip) : "");
++		if (this.options.sourcesZip) versionBody.set("source", await openAsBlob(this.options.sourcesZip), path.basename(this.options.sourcesZip));
++		else versionBody.set("source", "");
+ 		const version = await this.client.post("/api/v5/addons/addon/{idOrSlugOrGuid}/versions/", {
+ 			params: { idOrSlugOrGuid: this.extensionId },
+ 			body: versionBody
