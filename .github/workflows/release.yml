@@ -37,7 +37,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     needs: [check]
     permissions:
       contents: write
@@ -97,15 +97,26 @@ jobs:
             .output/*-sources.zip
 
       - name: Submit to AMO
+        id: amo
         if: ${{ env.FIREFOX_JWT_ISSUER != '' }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          pnpm wxt submit \
-            --firefox-zip ".output/maintab-${VERSION}-firefox.zip" \
-            --firefox-sources-zip ".output/maintab-${VERSION}-sources.zip"
+          set +e
+          node scripts/amo-submit.mjs "$VERSION" \
+            ".output/maintab-${VERSION}-firefox.zip" \
+            ".output/maintab-${VERSION}-sources.zip"
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "submitted=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::AMO is read-only; $VERSION is left for the AMO retry workflow"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo "submitted=true" >> "$GITHUB_OUTPUT"
 
       - name: Attach signed xpi
-        if: ${{ env.FIREFOX_JWT_ISSUER != '' }}
+        if: ${{ steps.amo.outputs.submitted == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

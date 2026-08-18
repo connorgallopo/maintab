@@ -1,0 +1,101 @@
+name: AMO retry
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to submit; defaults to the latest release'
+        required: false
+
+concurrency:
+  group: amo-retry
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    name: Submit pending release to AMO
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      FIREFOX_EXTENSION_ID: maintab@connorgallopo.github.io
+      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+      FIREFOX_CHANNEL: unlisted
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Resolve target tag
+        id: target
+        if: ${{ env.FIREFOX_JWT_ISSUER != '' }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          fi
+          if [ -z "$TAG" ]; then
+            echo "no releases to check"
+            exit 0
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether AMO has it
+        id: check
+        if: ${{ steps.target.outputs.version != '' }}
+        run: node scripts/amo-pending.mjs "${{ steps.target.outputs.version }}"
+
+      - name: Setup pnpm
+        if: ${{ steps.check.outputs.pending == 'true' }}
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # master, devEngines support
+
+      - name: Install dependencies
+        if: ${{ steps.check.outputs.pending == 'true' }}
+        run: pnpm install --frozen-lockfile
+
+      # The zips already attached to the release are what AMO should get, so they are reused rather than rebuilt.
+      - name: Download release zips
+        if: ${{ steps.check.outputs.pending == 'true' }}
+        run: |
+          mkdir -p .output
+          gh release download "${{ steps.target.outputs.tag }}" --dir .output \
+            --pattern '*-firefox.zip' --pattern '*-sources.zip' --clobber
+
+      - name: Submit to AMO
+        id: amo
+        if: ${{ steps.check.outputs.pending == 'true' }}
+        env:
+          AMO_WAIT_MINUTES: 5
+        run: |
+          VERSION="${{ steps.target.outputs.version }}"
+          set +e
+          node scripts/amo-submit.mjs "$VERSION" \
+            ".output/maintab-${VERSION}-firefox.zip" \
+            ".output/maintab-${VERSION}-sources.zip"
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "submitted=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AMO still read-only; leaving $VERSION for the next run"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo "submitted=true" >> "$GITHUB_OUTPUT"
+
+      - name: Attach signed xpi
+        if: ${{ steps.amo.outputs.submitted == 'true' }}
+        run: |
+          VERSION="${{ steps.target.outputs.version }}"
+          node scripts/fetch-signed-xpi.mjs "$VERSION" ".output/maintab-${VERSION}.xpi"
+          gh release upload "${{ steps.target.outputs.tag }}" ".output/maintab-${VERSION}.xpi" --clobber
