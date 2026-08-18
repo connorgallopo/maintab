@@ -11,9 +11,8 @@
   </span>
   {#if item.spark}<Sparkline points={item.spark} />{/if}
   {#if item.value}<span class="value">{item.value}{#if item.delta}<span class="delta"> {item.delta}</span>{/if}</span>{/if}
-  {#if item.badge}
-    <span class="badge {item.badge.kind} tone-{item.badge.tone}">{item.badge.text}</span>
-  {/if}
+  {#if item.tag}<span class="tag tone-{item.tag.tone}">{item.tag.text}</span>{/if}
+  {#if item.pill}<span class="pill">{item.pill.text}</span>{/if}
   {#if item.counts}
     <span class="counts">
       {#each item.counts as c, i}{#if i}<span class="sep">/</span>{/if}<span class="cnt tone-{c.tone}">{c.value}</span>{/each}
@@ -35,12 +34,13 @@
   .primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
   .delta { font-size: 11px; color: var(--good); }
-  .badge { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+  .tag, .pill { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
   .pill { background: var(--accent); color: var(--accent-ink); border-radius: 4px; padding: 2px 7px; font-weight: 500; }
   .tag.tone-crit { color: var(--crit); }
   .tag.tone-warn { color: var(--warn); }
   .tag.tone-good { color: var(--good); }
-  .tag.tone-dim, .tag.tone-accent { color: var(--sub); }
+  .tag.tone-accent { color: var(--accent); }
+  .tag.tone-dim, .tag.tone-mid { color: var(--sub); }
   .counts { display: flex; gap: 2px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
   .sep { color: var(--dim); }
   .cnt.tone-crit { color: var(--crit); }

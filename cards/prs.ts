@@ -117,7 +117,7 @@ function derive(data: PrsData, stored: PrsStored | undefined, now: number, confi
       href: pr.url,
       repo: `${pr.repo.split('/')[1]} #${pr.number}`,
       primary: pr.title,
-      badge: unread > 0 ? { kind: 'pill' as const, text: `${unread} new`, tone: 'accent' as const } : undefined,
+      pill: unread > 0 ? { text: `${unread} new` } : undefined,
     };
   });
 
@@ -126,7 +126,7 @@ function derive(data: PrsData, stored: PrsStored | undefined, now: number, confi
     href: r.url,
     repo: `${r.repo.split('/')[1]} #${r.number}`,
     primary: r.title,
-    badge: { kind: 'tag' as const, text: 'review', tone: 'accent' as const },
+    tag: { text: 'review', tone: 'accent' as const },
   }));
 
   const combined = [...authoredItems, ...reviewItems];
@@ -177,10 +177,10 @@ export async function markSeen(prId: string): Promise<void> {
   const data = entry.data as PrsStored;
   const item = entry.slice.items.find((i) => i.id === prId);
   if (!item) return;
-  if (item.badge && item.badge.kind !== 'pill') return;
+  if (item.tag && !item.pill) return;
   const current = data.seen[prId];
-  const unread = item.badge ? Number.parseInt(item.badge.text, 10) : 0;
+  const unread = item.pill ? Number.parseInt(item.pill.text, 10) : 0;
   data.seen[prId] = { commentTotal: (current?.commentTotal ?? 0) + unread, seenAt: Date.now() };
-  item.badge = undefined;
+  item.pill = undefined;
   await modulesItem.setValue({ ...state, prs: { ...entry, data, slice: { ...entry.slice } } });
 }

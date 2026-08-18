@@ -79,7 +79,7 @@ function derive(data: NotifData, stored: NotifStored | undefined, now: number, _
         href: t.href,
         repo: t.repo.split('/')[1],
         primary: t.title,
-        badge: { kind: 'tag' as const, text: t.reason, tone: 'dim' as const },
+        tag: { text: t.reason, tone: 'dim' as const },
       })),
       tile: {
         n: data.threads.length,

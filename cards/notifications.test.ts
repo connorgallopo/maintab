@@ -83,7 +83,7 @@ describe('derive', () => {
     ];
     const { slice } = notificationsModule.derive({ threads, changed: true }, undefined, NOW);
     expect(slice.tile).toMatchObject({ n: 2, note: '1 review request' });
-    expect(slice.items[0]!.badge).toEqual({ kind: 'tag', text: 'review requested', tone: 'dim' });
+    expect(slice.items[0]!.tag).toEqual({ text: 'review requested', tone: 'dim' });
     expect(slice.headerHref).toBe('https://github.com/notifications');
   });
 

@@ -59,20 +59,8 @@
     return false;
   }
 
-  const commentsTile = $derived.by((): Tile => {
-    const items = modules.prs?.slice.items ?? [];
-    const unread = items
-      .filter((i) => i.badge?.kind === 'pill')
-      .reduce((n, i) => n + (Number.parseInt(i.badge!.text, 10) || 0), 0);
-    const touched = items.filter((i) => i.badge?.kind === 'pill').length;
-    return {
-      n: unread, label: 'New comments', accent: unread > 0,
-      note: touched ? `${touched} PR${touched === 1 ? '' : 's'} touched` : undefined,
-      noteTone: touched ? 'good' : undefined,
-    };
-  });
   const tiles = $derived(
-    [modules.prs?.slice.tile, commentsTile, modules.notifications?.slice.tile, modules.vulns?.slice.tile]
+    [modules.prs?.slice.tile, modules.notifications?.slice.tile, modules.vulns?.slice.tile]
       .filter((t): t is Tile => Boolean(t)),
   );
   const busy = $derived(sync.inFlightSince > 0);

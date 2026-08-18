@@ -5,7 +5,9 @@ export interface RowItem {
   href: string;
   repo?: string;
   primary: string;
-  badge?: { kind: 'pill' | 'tag'; text: string; tone: Tone };
+  tag?: { text: string; tone: Tone };
+  pill?: { text: string };
+  mark?: { total: number };
   spark?: number[];
   value?: string;
   delta?: string;
@@ -17,7 +19,7 @@ export interface Tile {
   label: string;
   note?: string;
   noteTone?: Tone;
-  accent?: boolean;
+  tone?: 'accent' | 'crit';
 }
 
 export interface Slice {
