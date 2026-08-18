@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Config } from '../../lib/types';
-  import { configItem } from '../../lib/storage';
+  import { configItem, resetAccount } from '../../lib/storage';
   import RepoListEditor from '../../components/kit/RepoListEditor.svelte';
   import { untrack } from 'svelte';
   import { browser } from '#imports';
@@ -22,9 +22,9 @@
 
   async function save() {
     const base = $state.snapshot(config);
+    const nextPat = pat.trim();
     await configItem.setValue({
       ...base,
-      pat: pat.trim(),
       pollMinutes: clamp(pollMinutes, 1, 60, 5),
       themePin,
       repos: { ...base.repos, ignored: $state.snapshot(ignored) },
@@ -39,6 +39,7 @@
         stars: { ...base.modules.stars, trackedRepos: $state.snapshot(trackedRepos) },
       },
     });
+    if (nextPat !== base.pat) await resetAccount(nextPat);
     void browser.runtime.sendMessage({ type: 'refresh' });
     onclose();
   }

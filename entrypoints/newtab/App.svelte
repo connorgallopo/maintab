@@ -3,7 +3,7 @@
   import { untrack } from 'svelte';
   import { browser } from '#imports';
   import type { Config, ModulesState, SyncState, Tile } from '../../lib/types';
-  import { configItem, syncItem, modulesItem } from '../../lib/storage';
+  import { configItem, syncItem, modulesItem, resetAccount } from '../../lib/storage';
   import { markSeen } from '../../lib/seen';
   import { markRead } from '../../cards/notifications';
   import Masthead from '../../components/kit/Masthead.svelte';
@@ -34,7 +34,7 @@
   });
 
   $effect(() => {
-    if (config.pat && Date.now() - sync.lastSyncAt > config.pollMinutes * 60_000) refresh();
+    if (config.pat && !sync.authError && Date.now() - sync.lastSyncAt > config.pollMinutes * 60_000) refresh();
   });
 
   function refresh() {
@@ -47,7 +47,7 @@
   }
 
   async function savePat(pat: string) {
-    await configItem.setValue({ ...$state.snapshot(config), pat });
+    await resetAccount(pat);
     refresh();
   }
 
