@@ -14,7 +14,6 @@ const ROOT = {
 };
 const DISCOVERY = { viewer: { repositories: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } };
 
-/** Route by query text: discovery, batch, or root. */
 function stubGithub(overrides: { root?: unknown; discovery?: unknown; batch?: unknown } = {}) {
   const spy = vi.spyOn(github, 'graphql').mockImplementation(async (_pat, query) => {
     if (query.includes('fragment RepoFields')) return overrides.batch ?? {};
@@ -187,7 +186,6 @@ describe('runCycle', () => {
   it('does not write modules when the token changed mid-cycle', async () => {
     vi.spyOn(github, 'graphql').mockImplementation(async (_pat, query) => {
       if (query.includes('viewer { repositories(')) {
-        // token swapped while discovery is in flight
         await configItem.setValue({ ...(await configItem.getValue()), pat: 'other' });
         return DISCOVERY;
       }
@@ -205,6 +203,6 @@ describe('runCycle', () => {
     stubGithub();
     const [a, b] = await Promise.all([runCycle(NOW), runCycle(NOW)]);
     expect([a, b].sort()).toEqual(['in-flight', 'ok']);
-    expect(github.graphql).toHaveBeenCalledTimes(2); // root + discovery
+    expect(github.graphql).toHaveBeenCalledTimes(2);
   });
 });

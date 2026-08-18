@@ -1,4 +1,3 @@
-// entrypoints/newtab/main.ts
 import { mount } from 'svelte';
 import App from './App.svelte';
 import '../../assets/tokens.css';

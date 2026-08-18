@@ -20,8 +20,6 @@ export default defineBackground(() => {
     if (alarm.name === 'poll') void runCycle();
   });
   browser.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendResponse) => {
-    // Chrome needs `return true` to hold the message channel open for an
-    // async sendResponse; promise-returning listeners are Chrome 148+ and still rolling out.
     if (msg?.type !== 'refresh') return;
     void runCycle().then(sendResponse);
     return true;

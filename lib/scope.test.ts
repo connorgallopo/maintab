@@ -136,7 +136,7 @@ describe('fetchRepoNodes', () => {
     });
     const nodes = await fetchRepoNodes('tok', refs, BASE_REPO_FIELDS);
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(nodes).toHaveLength(REPO_BATCH + 2 - 2); // one null per chunk
+    expect(nodes).toHaveLength(REPO_BATCH + 2 - 2);
     expect(nodes[0]!.nameWithOwner).toBe('x0');
     expect(nodes[1]!.nameWithOwner).toBe('x2');
   });

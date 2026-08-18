@@ -1,4 +1,3 @@
-<!-- entrypoints/newtab/App.svelte -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { browser } from '#imports';
