@@ -51,10 +51,20 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Check whether AMO has it
+      - name: Check what is missing
         id: check
         if: ${{ steps.target.outputs.version != '' }}
-        run: node scripts/amo-pending.mjs "${{ steps.target.outputs.version }}"
+        run: |
+          VERSION="${{ steps.target.outputs.version }}"
+          node scripts/amo-pending.mjs "$VERSION"
+          if gh release view "${{ steps.target.outputs.tag }}" --json assets -q '.assets[].name' \
+            | grep -qx "maintab-${VERSION}.xpi"; then
+            echo "xpi=present" >> "$GITHUB_OUTPUT"
+            echo "the release already carries maintab-${VERSION}.xpi"
+          else
+            echo "xpi=missing" >> "$GITHUB_OUTPUT"
+            echo "the release has no maintab-${VERSION}.xpi yet"
+          fi
 
       - name: Setup pnpm
         if: ${{ steps.check.outputs.pending == 'true' }}
@@ -93,9 +103,18 @@ jobs:
           [ "$code" -eq 0 ] || exit "$code"
           echo "submitted=true" >> "$GITHUB_OUTPUT"
 
+      # Runs whether the version was just submitted or landed on an earlier attempt that failed to attach it.
       - name: Attach signed xpi
-        if: ${{ steps.amo.outputs.submitted == 'true' }}
+        if: ${{ steps.check.outputs.xpi == 'missing' && (steps.check.outputs.pending == 'false' || steps.amo.outputs.submitted == 'true') }}
         run: |
           VERSION="${{ steps.target.outputs.version }}"
+          set +e
           node scripts/fetch-signed-xpi.mjs "$VERSION" ".output/maintab-${VERSION}.xpi"
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "::notice::signing not ready; leaving the xpi for the next run"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
           gh release upload "${{ steps.target.outputs.tag }}" ".output/maintab-${VERSION}.xpi" --clobber

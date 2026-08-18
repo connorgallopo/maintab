@@ -121,5 +121,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          set +e
           node scripts/fetch-signed-xpi.mjs "$VERSION" ".output/maintab-${VERSION}.xpi"
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "::warning::signing did not finish in time; the AMO retry workflow will attach the xpi"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
           gh release upload "$GITHUB_REF_NAME" ".output/maintab-${VERSION}.xpi" --clobber
